@@ -1,7 +1,8 @@
 // Acto 1: la ciudadela construida, con su reporte.
-import type { Analisis, AreaId, Hallazgo, NodoAnalizado, PasoRuta, Severidad } from '../engine/index.ts';
+import type { Analisis, AreaId, Hallazgo, NodoAnalizado, PasoRuta, RutaAtaque, Severidad } from '../engine/index.ts';
 import { COMO_SE_CALCULA, ETIQUETA_SEVERIDAD, PESO_SEVERIDAD, PIE_DEL_REPORTE } from '../engine/index.ts';
 import { Ciudadela, ID_BOVEDA, ID_FARO } from '../escena/ciudadela.ts';
+import { Simulacion } from '../escena/simulacion.ts';
 import { COLOR_SEVERIDAD, NOMBRE_ROL } from '../escena/paleta.ts';
 import { h, icono, poner, textoRico, vaciar } from './dom.ts';
 import { ICONO, ICONO_DEFENSA } from './iconos.ts';
@@ -104,7 +105,8 @@ export function crearVista(datos: DatosVista, acciones: { alVolver(): void }): V
   );
   const pista = h('p', { class: 'escenario-pista' }, 'Arrastra para girar · rueda para acercar · clic en un edificio para ver sus hallazgos');
   const botonEncuadre = h('button', { class: 'boton boton-icono escenario-encuadre', type: 'button', title: 'Ver toda la ciudadela', 'aria-label': 'Ver toda la ciudadela', onclick: () => ciudadela?.encuadrar() }, icono(ICONO.encuadre));
-  const escenario = h('section', { class: 'escenario', 'aria-label': 'Ciudadela' }, lienzo, globo, leyenda, pista, botonEncuadre, detalle);
+  const narrador = h('div', { class: 'narrador', hidden: true, 'aria-live': 'polite' });
+  const escenario = h('section', { class: 'escenario', 'aria-label': 'Ciudadela' }, lienzo, globo, leyenda, pista, botonEncuadre, narrador, detalle);
 
   // --- Detalle de un nodo ---------------------------------------------------
   const cerrarDetalle = () => {
@@ -306,7 +308,8 @@ export function crearVista(datos: DatosVista, acciones: { alVolver(): void }): V
         h(
           'div',
           { class: 'ruta-acciones' },
-          h('button', { class: 'boton', type: 'button', onclick: () => enfocar(ruta.pasos.map((p) => p.nodo), ruta.severidad) }, 'Ver la ruta en la ciudadela'),
+          h('button', { class: 'boton boton-ataque', type: 'button', onclick: () => simular(0) }, icono(ICONO.ruta), 'Simular ataque'),
+          h('button', { class: 'boton', type: 'button', onclick: () => enfocar(ruta.pasos.map((p) => p.nodo), ruta.severidad) }, 'Ver la ruta'),
           a.rutas.length > 1 ? h('span', { class: 'ruta-mas' }, `+${a.rutas.length - 1} ${a.rutas.length === 2 ? 'ruta más' : 'rutas más'}`) : null,
         ),
       )
@@ -314,6 +317,7 @@ export function crearVista(datos: DatosVista, acciones: { alVolver(): void }): V
         'section',
         { class: 'ruta ruta-cerrada' },
         h('div', { class: 'ruta-cabecera' }, icono(ICONO.escudo), h('div', null, h('p', { class: 'ruta-sello' }, 'La ciudadela resiste'), h('h3', null, 'No se encontró una ruta de ataque con las reglas actuales.'))),
+        h('div', { class: 'ruta-acciones' }, h('button', { class: 'boton', type: 'button', onclick: () => simular(0) }, icono(ICONO.ruta), 'Poner a prueba la ciudadela')),
       );
 
   const panel = h(
@@ -347,19 +351,133 @@ export function crearVista(datos: DatosVista, acciones: { alVolver(): void }): V
     h('footer', { class: 'panel-pie' }, h('p', { text: PIE_DEL_REPORTE }), h('p', { class: 'firma' }, 'Hecho por Alkyora')),
   );
 
+  // --- Acto 2: simulación de ataque -----------------------------------------
+  let simulacion: Simulacion | null = null;
+
+  const cerrarSimulacion = () => {
+    if (narrador.hidden) return;
+    simulacion?.detener();
+    narrador.hidden = true;
+    pista.hidden = false;
+    pintarActos(1);
+    ciudadela?.encuadrar();
+  };
+
+  const NOTA_SIMULACION = 'Es una visualización del recorrido de los datos, armada con los hallazgos. No se ejecuta el workflow ni se contacta ningún servicio.';
+
+  const pintarNarrador = (r: RutaAtaque | null, indice: number, paso: number, fin: 'llego' | 'reboto' | null) => {
+    vaciar(narrador);
+    const otras = a.rutas.map((x, i) => ({ x, i })).filter(({ i }) => i !== indice);
+    const cabecera = h(
+      'div',
+      { class: 'narrador-cabecera' },
+      h('span', { class: 'narrador-sello' }, r ? 'Simulación de ataque' : 'Prueba de resistencia'),
+      r && !fin ? h('span', { class: 'narrador-progreso' }, `Paso ${paso + 1} de ${r.pasos.length}`) : null,
+      h('button', { class: 'boton boton-icono narrador-cerrar', type: 'button', 'aria-label': 'Cerrar la simulación', onclick: cerrarSimulacion }, icono(ICONO.cerrar)),
+    );
+    const cuerpo: Array<Node | null> = [];
+    if (!r) {
+      cuerpo.push(
+        fin
+          ? h('p', { class: 'narrador-texto narrador-bien' }, h('strong', null, 'La ciudadela resiste. '), 'No se encontró una ruta de ataque con las reglas actuales.')
+          : h('p', { class: 'narrador-texto' }, 'Alguien de fuera se acerca a la muralla y busca una entrada…'),
+      );
+    } else {
+      cuerpo.push(
+        h('div', { class: 'narrador-puntos', 'aria-hidden': 'true' }, r.pasos.map((p, i) => h('i', { class: `${p.regla ? 'clave' : ''} ${i < paso || fin ? 'hecho' : i === paso ? 'actual' : ''}`.trim() }))),
+      );
+      const actual = r.pasos[paso];
+      if (fin === 'llego') {
+        cuerpo.push(
+          h('p', { class: 'narrador-texto narrador-mal' }, h('strong', null, `El intruso llegó hasta «${r.salida}». `), r.pasos[r.pasos.length - 1].texto),
+          h('p', { class: 'narrador-sub' }, `${r.titulo}. Los edificios en rojo son los que quedaron comprometidos en el camino.`),
+        );
+      } else if (actual) {
+        cuerpo.push(h('p', { class: 'narrador-texto' }, actual.regla ? h('span', { class: 'codigo', text: actual.regla }) : null, actual.texto));
+      }
+    }
+    const acciones2 = h('div', { class: 'narrador-acciones' });
+    if (!fin) {
+      acciones2.append(h('button', { class: 'boton', type: 'button', onclick: () => simulacion?.saltar() }, 'Saltar'));
+    } else {
+      acciones2.append(h('button', { class: 'boton', type: 'button', onclick: () => simular(indice) }, 'Repetir'));
+      for (const { x, i } of otras.slice(0, 4)) {
+        acciones2.append(h('button', { class: 'boton boton-ruta', type: 'button', title: `${x.titulo} (hasta «${x.salida}»)`, onclick: () => simular(i) }, h('span', { class: `punto sev-${x.severidad}` }), `Hasta ${x.salida}`));
+      }
+      acciones2.append(h('button', { class: 'boton', type: 'button', onclick: cerrarSimulacion }, 'Volver a la ciudadela'));
+    }
+    poner(narrador, cabecera, ...cuerpo, fin && otras.length ? h('p', { class: 'narrador-sub' }, otras.length === 1 ? 'Hay otra ruta posible. Mírala:' : `Hay ${otras.length} rutas más. Mira hasta dónde llegan:`) : null, acciones2, h('p', { class: 'narrador-nota' }, NOTA_SIMULACION));
+    narrador.hidden = false;
+  };
+
+  const simular = (indice: number) => {
+    const r = a.rutas[indice] ?? null;
+    if (!ciudadela || !simulacion) {
+      // Sin 3D no hay animación: el recorrido está descrito en la tarjeta de la ruta.
+      panel.querySelector('.ruta')?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+      return;
+    }
+    cerrarDetalle();
+    ciudadela.limpiarEnfoque();
+    pista.hidden = true;
+    leyenda.open = false;
+    pintarActos(2);
+    if (r) {
+      pintarNarrador(r, indice, 0, null);
+      simulacion.iniciar({
+        pasos: r.pasos.map((p) => ({ nodo: p.nodo, clave: !!p.regla })),
+        reboteEn: null,
+        alPaso: (i) => pintarNarrador(r, indice, i, null),
+        alRebote: () => undefined,
+        alTerminar: (resultado) => {
+          pintarNarrador(r, indice, r.pasos.length - 1, resultado);
+          // Al terminar, la cámara se aleja para mostrar todo el recorrido.
+          ciudadela?.enfocar(r.pasos.map((p) => p.nodo), 0xffffff, false);
+        },
+      });
+    } else {
+      // Sin ruta: el intruso se acerca a la puerta y la ciudadela resiste.
+      const puerta = a.nodos.find((n) => n.rol === 'entrada_no_confiable') ?? a.nodos.find((n) => n.rol === 'entrada_interna');
+      pintarNarrador(null, -1, 0, null);
+      simulacion.iniciar({
+        pasos: [{ nodo: puerta?.nombre ?? '', clave: true }],
+        reboteEn: 0,
+        alPaso: () => undefined,
+        alRebote: () => undefined,
+        alTerminar: (resultado) => pintarNarrador(null, -1, 0, resultado),
+      });
+    }
+  };
+
   // --- Barra superior -------------------------------------------------------
-  const acto = (numero: number, titulo: string, activo: boolean, nota?: string) =>
-    h('li', { class: activo ? 'acto activo' : 'acto', title: nota ?? '' }, h('span', { class: 'acto-numero', text: String(numero) }), h('span', { text: titulo }), nota ? h('span', { class: 'acto-nota', text: nota }) : null);
+  const actos = h('ol', { class: 'actos', 'aria-label': 'Los tres actos' });
+  const pintarActos = (activo: number) => {
+    vaciar(actos);
+    const acto = (numero: number, titulo: string, alPulsar: (() => void) | null, nota?: string) =>
+      h(
+        'li',
+        null,
+        h(
+          'button',
+          { class: numero === activo ? 'acto activo' : 'acto', type: 'button', disabled: !alPulsar, title: nota ?? '', 'aria-current': numero === activo ? 'step' : null, onclick: alPulsar ?? undefined },
+          h('span', { class: 'acto-numero', text: String(numero) }),
+          h('span', { text: titulo }),
+          nota ? h('span', { class: 'acto-nota', text: nota }) : null,
+        ),
+      );
+    actos.append(acto(1, 'Construir', () => cerrarSimulacion()), acto(2, 'Simular ataque', () => simular(0)), acto(3, 'Blindar', null, 'próxima fase'));
+  };
   const barra = h(
     'header',
     { class: 'barra' },
     h('button', { class: 'marca', type: 'button', onclick: acciones.alVolver, title: 'Volver al inicio' }, h('span', { class: 'marca-almenas', 'aria-hidden': 'true' }), 'Ciudadela'),
-    h('ol', { class: 'actos', 'aria-label': 'Los tres actos' }, acto(1, 'Construir', true), acto(2, 'Simular ataque', false, 'próxima fase'), acto(3, 'Blindar', false, 'próxima fase')),
+    actos,
     h('div', { class: 'barra-derecha' }, h('span', { class: 'privado' }, icono(ICONO.candado), 'Tu workflow no sale de tu navegador'), h('button', { class: 'boton', type: 'button', onclick: acciones.alVolver }, 'Analizar otro')),
   );
 
   const el = h('div', { class: 'vista' }, barra, h('div', { class: 'vista-cuerpo' }, panel, escenario));
   pintar();
+  pintarActos(1);
 
   // --- Escena 3D ------------------------------------------------------------
   const iniciar = () => {
@@ -402,6 +520,7 @@ export function crearVista(datos: DatosVista, acciones: { alVolver(): void }): V
       },
     });
     ciudadela.cargar(a);
+    simulacion = new Simulacion(ciudadela);
   };
   // Espera a que el contenedor tenga tamaño antes de crear el lienzo.
   requestAnimationFrame(iniciar);
@@ -409,6 +528,7 @@ export function crearVista(datos: DatosVista, acciones: { alVolver(): void }): V
   return {
     el,
     destruir: () => {
+      simulacion?.detener();
       ciudadela?.destruir();
       ciudadela = null;
     },

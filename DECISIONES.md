@@ -79,3 +79,20 @@ Los nombres de nodos vienen del JSON del usuario. La interfaz los inserta siempr
 
 **D25. Los pasos de tránsito de una ruta se agrupan en el panel.**
 "Pasa por 6 nodos sin que nadie lo revise" en una línea, en vez de seis líneas iguales. Los pasos con regla se muestran siempre.
+
+## Fase 3: simulación de ataque
+
+**D26. La simulación es una reproducción, no un cálculo.**
+La escena solo recibe los nodos de una ruta que ya construyó el motor. Si el motor no encontró ruta, no hay nada que animar salvo el rebote en la puerta. Así es imposible que la animación muestre algo que el análisis no sostiene.
+
+**D27. Sin ruta, el intruso rebota en la puerta.**
+Para el caso "la ciudadela resiste" se reutiliza el mismo rebote que usará el blindaje, con el texto exacto del prompt: "No se encontró una ruta de ataque con las reglas actuales".
+
+**D28. La narración dice lo que pasa, no cómo hacerlo.**
+Cada frase describe un efecto ("el agente recibe el mensaje tal cual") y nunca un contenido de mensaje, una carga útil ni un paso técnico. Debajo del narrador se lee siempre que es una visualización y que no se ejecuta nada.
+
+**D29. Las demás rutas se identifican por su destino.**
+Dos rutas pueden compartir título (dos descargas con URL del mensaje). Los botones dicen "Hasta descarga_audio" para distinguirlas.
+
+**D30. Duración máxima de 24 segundos.**
+El prompt pide menos de 30. Las rutas largas se comprimen en el tiempo en lugar de recortar pasos.

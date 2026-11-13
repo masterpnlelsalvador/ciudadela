@@ -119,6 +119,12 @@ export class Ciudadela {
   private plano: Plano | null = null;
   /** true cuando la persona ya movió la cámara: desde ahí no se reencuadra sola. */
   private camaraMovida = false;
+  /** Gancho por cuadro para la simulación (recibe performance.now()). */
+  alCuadro: ((ahora: number) => void) | null = null;
+  private seguido: THREE.Vector3 | null = null;
+  private distanciaSeguimiento = 26;
+  private tenidos = new Map<string, () => void>();
+  private indiceCasa = new Map<string, number>();
 
   constructor(contenedor: HTMLElement, opciones: OpcionesCiudadela) {
     this.contenedor = contenedor;
@@ -354,6 +360,11 @@ export class Ciudadela {
     this.aroPaso.visible = false;
     this.aroEleccion.visible = false;
     this.bajoPuntero = null;
+    this.alCuadro = null;
+    this.seguido = null;
+    this.tenidos.clear();
+    this.indiceCasa.clear();
+    this.controles.enabled = true;
   }
 
   private etiqueta(texto: string, punto: THREE.Vector3, clase: string): void {
@@ -480,6 +491,7 @@ export class Ciudadela {
       retraso,
     };
     this.casas.push(casa);
+    this.indiceCasa.set(n.nombre, this.casas.length - 1);
     (casa as Casa & { tipo: string; apagada: boolean }).tipo = n.tipoCorto;
     (casa as Casa & { tipo: string; apagada: boolean }).apagada = n.deshabilitado;
     return { nombre: n.nombre, x: p.x, z: p.z, alto: casa.alto + casa.techo, radio: 1.05, grupo: null, retraso };
@@ -567,6 +579,7 @@ export class Ciudadela {
       brillo.position.set(0, 1.6, 1.6);
       g.add(brillo);
     }
+    g.userData.normal = normal;
     return { nombre: n.nombre, x: p.x, z: p.z, alto: 4.4, radio: 1.9, grupo: g, retraso };
   }
 
@@ -924,6 +937,15 @@ export class Ciudadela {
       this.controles.target.lerpVectors(this.vuelo.o0, this.vuelo.o1, k);
       if (t >= 1) this.vuelo = null;
     }
+    if (this.alCuadro) this.alCuadro(ahora);
+    if (this.seguido && !this.vuelo) {
+      // La cámara acompaña al punto seguido conservando su ángulo.
+      const desplazamiento = this.camara.position.clone().sub(this.controles.target);
+      const largo = desplazamiento.length();
+      const deseado = THREE.MathUtils.lerp(largo, this.distanciaSeguimiento, 0.04);
+      this.controles.target.lerp(this.seguido, 0.07);
+      this.camara.position.copy(this.controles.target).add(desplazamiento.multiplyScalar(deseado / largo));
+    }
     this.controles.update();
 
     if (!this.quieto) {
@@ -1031,14 +1053,14 @@ export class Ciudadela {
   }
 
   /** Levanta haces de luz sobre los nodos indicados y acerca la cámara a ellos. */
-  enfocar(nombres: string[], color = 0xffffff): void {
+  enfocar(nombres: string[], color = 0xffffff, conHaces = true): void {
     const ciudad = this.ciudad;
     if (!ciudad) return;
     for (const h of this.haces) ciudad.remove(h);
     this.haces = [];
     const destinos = nombres.map((n) => this.edificios.get(n)).filter((e): e is Edificio => !!e);
     if (!destinos.length) return;
-    for (const e of destinos) {
+    for (const e of conHaces ? destinos : []) {
       const haz = new THREE.Mesh(
         new THREE.CylinderGeometry(e.radio * 0.9, e.radio * 0.9, 26, 20, 1, true),
         new THREE.MeshBasicMaterial({ color, transparent: true, opacity: 0.2, toneMapped: false, depthWrite: false, side: THREE.DoubleSide }),
@@ -1121,10 +1143,95 @@ export class Ciudadela {
     if (this.plano && !this.camaraMovida && Math.abs(previo - this.camara.aspect) > 0.05) this.encuadrar(false, true);
   }
 
-  /** Posición de un edificio y su altura (para la simulación de la fase 3). */
-  lugarDe(nombre: string): { x: number; z: number; alto: number } | null {
+  // -------------------------------------------------------------------------
+  // Puerto para la simulación de ataque (src/escena/simulacion.ts)
+
+  get sinMovimiento(): boolean {
+    return this.quieto;
+  }
+
+  /** Posición, tamaño y, para las puertas, hacia dónde miran. */
+  lugarDe(nombre: string): { x: number; z: number; alto: number; radio: number; normal: { x: number; z: number } | null } | null {
     const e = this.edificios.get(nombre);
-    return e ? { x: e.x, z: e.z, alto: e.alto } : null;
+    if (!e) return null;
+    return { x: e.x, z: e.z, alto: e.alto, radio: e.radio, normal: (e.grupo?.userData.normal as { x: number; z: number } | undefined) ?? null };
+  }
+
+  /** Punto de la muralla oeste, para cuando el workflow no tiene ninguna puerta. */
+  puntoDeMuralla(): { x: number; z: number; normal: { x: number; z: number } } {
+    const m = this.plano?.muralla;
+    return { x: m ? m.minX : -8, z: 0, normal: { x: -1, z: 0 } };
+  }
+
+  agregar(objeto: THREE.Object3D): void {
+    this.ciudad?.add(objeto);
+  }
+
+  quitar(objeto: THREE.Object3D): void {
+    this.ciudad?.remove(objeto);
+  }
+
+  /** La cámara acompaña a ese punto (null para soltarla). Mientras sigue, no se puede girar a mano. */
+  seguir(punto: THREE.Vector3 | null, distancia = 26): void {
+    this.seguido = punto;
+    this.distanciaSeguimiento = distancia;
+    this.controles.enabled = punto === null;
+    if (punto) {
+      this.vuelo = null;
+      this.camaraMovida = true;
+    }
+  }
+
+  /** Tiñe de rojo un edificio comprometido. */
+  tenir(nombre: string): void {
+    if (this.tenidos.has(nombre)) return;
+    const e = this.edificios.get(nombre);
+    if (!e) return;
+    const rojo = new THREE.Color(0xff3048);
+    if (e.grupo) {
+      const cambios: Array<[THREE.Mesh, THREE.Material | THREE.Material[]]> = [];
+      e.grupo.traverse((o) => {
+        const m = o as THREE.Mesh;
+        const original = m.material as THREE.Material | undefined;
+        if (!m.isMesh || !original || !(original as THREE.MeshStandardMaterial).isMeshStandardMaterial) return;
+        const base = original as THREE.MeshStandardMaterial;
+        const tenido = this.material(`rojo-${base.uuid}`, () => {
+          const copia = base.clone();
+          copia.color.lerp(rojo, 0.62);
+          copia.emissive = new THREE.Color(0xff1f3a);
+          copia.emissiveIntensity = 0.38;
+          return copia;
+        });
+        cambios.push([m, original]);
+        m.material = tenido;
+      });
+      this.tenidos.set(nombre, () => {
+        for (const [m, original] of cambios) m.material = original;
+      });
+      return;
+    }
+    const i = this.indiceCasa.get(nombre);
+    if (i === undefined || !this.mallaCasas || !this.mallaTechos) return;
+    const cuerpo = new THREE.Color();
+    const techo = new THREE.Color();
+    this.mallaCasas.getColorAt(i, cuerpo);
+    this.mallaTechos.getColorAt(i, techo);
+    this.mallaCasas.setColorAt(i, cuerpo.clone().lerp(rojo, 0.7));
+    this.mallaTechos.setColorAt(i, techo.clone().lerp(rojo, 0.75));
+    this.mallaCasas.instanceColor!.needsUpdate = true;
+    this.mallaTechos.instanceColor!.needsUpdate = true;
+    this.tenidos.set(nombre, () => {
+      if (!this.mallaCasas || !this.mallaTechos) return;
+      this.mallaCasas.setColorAt(i, cuerpo);
+      this.mallaTechos.setColorAt(i, techo);
+      this.mallaCasas.instanceColor!.needsUpdate = true;
+      this.mallaTechos.instanceColor!.needsUpdate = true;
+    });
+  }
+
+  quitarTintes(): void {
+    for (const restaurar of this.tenidos.values()) restaurar();
+    this.tenidos.clear();
   }
 
   destruir(): void {

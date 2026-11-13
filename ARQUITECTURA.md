@@ -2,7 +2,7 @@
 
 Ciudadela audita la seguridad de workflows de n8n con análisis estático. Todo corre en el navegador: no hay backend, ni analítica, ni peticiones de red en tiempo de ejecución.
 
-Estado: fases 1 y 2 terminadas (motor de análisis y ciudadela 3D estática con interacción). Ver `BITACORA.md`.
+Estado: fases 1 a 3 terminadas (motor de análisis, ciudadela 3D y simulación de ataque). Ver `BITACORA.md`.
 
 ## Mapa del repositorio
 
@@ -33,6 +33,7 @@ src/escena/
   plano.ts            Posiciones de n8n → parcelas, muralla y puertas.
   ciudadela.ts        Clase Ciudadela (three.js): edificios, símbolos, cámara e interacción.
   paleta.ts           Colores y nombres de los roles.
+  simulacion.ts       Clase Simulacion: el intruso que recorre una ruta, o que rebota.
 scripts/
   analizar.mjs        Reporte en texto desde la terminal.
   crear-ejemplos.mjs  Genera los tres ejemplos de public/ejemplos/.
@@ -123,6 +124,18 @@ Puntaje: `100 − Σ pesos` con mínimo 0 (crítico 25, alto 12, medio 6, bajo 2
 **Interacción.** `alPasar` (nombre bajo el cursor) y `alElegir` (clic) avisan a `vista.ts`, que pinta el globo y el panel de detalle. `enfocar(nombres)` levanta haces de luz y acerca la cámara. `lugarDe(nombre)` devuelve la posición de un edificio; lo usará la simulación de la fase 3.
 
 **Accesibilidad.** Con `prefers-reduced-motion` no hay animación de construcción, vuelos de cámara ni partículas en movimiento. Si no hay WebGL, la vista muestra solo el reporte (la vista plano 2D llega en la fase 6).
+
+## Simulación de ataque
+
+`src/escena/simulacion.ts` anima una `RutaAtaque` que ya calculó el motor. No decide nada: recibe la lista de nodos de la ruta y, opcionalmente, el índice del paso donde el ataque rebota.
+
+- **Línea de tiempo.** Al iniciar se calculan los tramos (de dónde a dónde, y cuándo) y los eventos (llegar a un nodo, rebotar, sacar el tesoro). Los pasos con regla se narran con una pausa de 2 segundos; los de tránsito, con 0,4. Si el total pasa de 24 segundos, se comprime.
+- **Qué se ve.** Un intruso rojo entra desde fuera de la muralla por la puerta de la ruta, deja un rastro de puntos, y cada edificio al que llega se tiñe de rojo (`Ciudadela.tenir`). Al final, el tesoro (gemas doradas) sale volando por la salida afectada. La cámara lo sigue (`Ciudadela.seguir`).
+- **Rebote.** Con `reboteEn: k`, el intruso se frena antes del paso `k`, aparece un destello y un escudo, y sale despedido. Se usa cuando no hay ruta (`k = 0`: la puerta resiste) y, en la fase 4, cuando el blindaje corrigió ese paso.
+- **Sin animaciones.** Con `prefers-reduced-motion` se muestra directamente el estado final. El botón "Saltar" hace lo mismo.
+- **Tiempo.** La simulación lleva su propio reloj: si la pestaña estuvo oculta, ese tiempo no cuenta.
+
+La narración (`vista.ts`, bloque "Acto 2") toma los textos de `ruta.pasos[i].texto`, que escribe `src/engine/rutas.ts`. La interfaz no redacta nada por su cuenta.
 
 ## Comandos
 

@@ -82,3 +82,26 @@ Capturas en `docs/capturas/`.
 ### Pendiente de aprobación
 
 La dirección visual. El prompt pide detenerse aquí antes de seguir con la simulación de ataque.
+
+## Fase 3: simulación de ataque
+
+Fecha: 13 de noviembre de 2026. Dirección visual de la fase 2 aprobada por Diego.
+
+### Qué se hizo
+
+- Acto 2: botón "Simular ataque" en la tarjeta de la ruta y en la barra de actos.
+- El intruso entra por la puerta de la ruta, la cámara lo sigue, los edificios comprometidos se tiñen de rojo y el tesoro sale por la salida afectada.
+- Narrador con el paso actual, su código de regla, el progreso y el botón "Saltar". Al terminar: resumen, "Repetir" y un botón por cada una de las otras rutas.
+- Sin ruta: "Poner a prueba la ciudadela" muestra al intruso rebotando en la puerta y el mensaje "No se encontró una ruta de ataque con las reglas actuales".
+
+### Qué falló y cómo se corrigió
+
+1. **La simulación se quedaba en el paso 1.** Para evitar saltos al volver de una pestaña oculta, el reloj limitaba cada cuadro a 0,1 segundos. Cuando el navegador dibuja pocos cuadros por segundo (ventana en segundo plano, equipo lento), la simulación avanzaba a cámara lenta. Corrección: se usa el tiempo real y solo se descartan los saltos de más de 1,5 segundos.
+2. **El intruso casi no se veía** al lado de las torres. Se agrandó y se alejó un poco la cámara que lo sigue.
+3. **El panel final tapaba el destino** y dos rutas tenían el mismo título. Los botones de las otras rutas ahora son compactos y nombran su destino, y la cámara se aleja al terminar para mostrar todo el recorrido.
+4. **Quedaba un resplandor rojo fuera de la muralla** después del rebote: la luz del intruso seguía encendida aunque él ya no se viera. Ahora se oculta al terminar.
+
+### Verificado en el navegador
+
+- Ejemplo 1: la ruta principal completa (9 pasos) y el resumen final, sin errores en consola.
+- Ejemplo 3: el intruso rebota en la puerta y aparece el mensaje de resistencia.
