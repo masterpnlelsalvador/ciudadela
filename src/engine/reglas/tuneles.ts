@@ -54,7 +54,7 @@ export function hayValidacionDeHost(ctx: Contexto, nombre: string): boolean {
         if (esCondicional(n)) {
           for (const c of condicionesDe(n)) {
             const der = typeof c.derecha === 'string' ? c.derecha : '';
-            if (/hostname|\.host\b|new URL\s*\(/.test(c.izquierda)) return true;
+            if (/hostname|\.host\b|new URL\s*\(|split\(\s*['"]\/['"]\s*\)\s*\[\s*2\s*\]/.test(c.izquierda)) return true;
             if (/^(startsWith|regex)$/.test(c.operacion) && /^\^?https?:\/\//.test(der)) return true;
           }
         } else if (esCodigo(n)) {

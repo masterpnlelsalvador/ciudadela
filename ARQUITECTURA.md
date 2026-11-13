@@ -2,7 +2,7 @@
 
 Ciudadela audita la seguridad de workflows de n8n con análisis estático. Todo corre en el navegador: no hay backend, ni analítica, ni peticiones de red en tiempo de ejecución.
 
-Estado: fases 1 a 3 terminadas (motor de análisis, ciudadela 3D y simulación de ataque). Ver `BITACORA.md`.
+Estado: fases 1 a 4 terminadas (motor de análisis, ciudadela 3D, simulación de ataque y blindaje). Ver `BITACORA.md`.
 
 ## Mapa del repositorio
 
@@ -20,7 +20,8 @@ src/engine/           Motor de análisis. Sin DOM. Lo usan la web, las pruebas y
   fortalezas.ts       Lo que el workflow hace bien.
   rutas.ts            Rutas de ataque a partir del grafo y los hallazgos.
   analizar.ts         Orquestador: contexto → reglas → rutas → puntajes → Analisis.
-  reporte.ts          Reporte en texto plano.
+  blindar.ts          Blindaje (workflow corregido), punto de rebote y "Limpiar para compartir".
+  reporte.ts          Reporte en texto plano y reporte Markdown.
   index.ts            API pública del motor.
 src/main.ts           Punto de entrada: alterna entre la pantalla inicial y la vista de la ciudadela.
 src/estilos.css       Hoja de estilos única. Sin fuentes externas.
@@ -36,6 +37,7 @@ src/escena/
   simulacion.ts       Clase Simulacion: el intruso que recorre una ruta, o que rebota.
 scripts/
   analizar.mjs        Reporte en texto desde la terminal.
+  blindar.mjs         Blinda un workflow desde la terminal y escribe el JSON corregido.
   crear-ejemplos.mjs  Genera los tres ejemplos de public/ejemplos/.
 public/ejemplos/      Ejemplos sintéticos + ESPERADO.md + indice.json.
 tests/                Vitest: unitarias por regla, ejemplos y pruebas de oro.
@@ -137,6 +139,32 @@ Puntaje: `100 − Σ pesos` con mínimo 0 (crítico 25, alto 12, medio 6, bajo 2
 
 La narración (`vista.ts`, bloque "Acto 2") toma los textos de `ruta.pasos[i].texto`, que escribe `src/engine/rutas.ts`. La interfaz no redacta nada por su cuenta.
 
+## Blindaje
+
+`blindar(workflow)` en `src/engine/blindar.ts` devuelve `{ workflow, cambios, porConfigurar, pendientes, antes, despues }`. Analiza el original, clona el JSON, aplica las correcciones y vuelve a analizar. Nunca modifica el objeto que recibe.
+
+Orden de trabajo:
+
+1. **Dentro de los nodos:** LLA-2 (vacía el secreto del Set), LLA-3 (header armado a mano → credencial marcador), POD-1, POD-2, POD-3, CAM-1, CAM-2, CIM-1, CIM-2 y VIG-2.
+2. **Puertas:** PUE-1 (Header Auth con credencial marcador, o nodo de validación si es un formulario público), PUE-3.
+3. **Nodos nuevos:** `filtro_de_entrada` antes de cada IA con MEN-1 o MEN-2, y `host_esperado` antes de cada descarga con TUN-1.
+4. **Ajustes del workflow:** `errorWorkflow` con marcador, `pinData` vacío y bloques de exportación fuera.
+5. **Nota adhesiva** "Blindado por Ciudadela" con los cambios y lo que hay que configurar.
+
+Reglas de diseño:
+
+- **Qué es autocorregible lo decide la regla, no el blindaje.** Cada hallazgo trae `autocorregible`, calculado con las mismas funciones que usa el blindaje (`opcionParaPod1`, `opcionParaPod2`, `plantillaAJs`). Una prueba comprueba que todo lo anunciado como autocorregible desaparece al volver a analizar.
+- **Nodos nuevos.** Id estable derivado del nombre (no aleatorio: el blindaje es determinista), nombre único, y posición libre cerca del nodo al que acompañan. Los nodos existentes conservan id, nombre, tipo y posición.
+- **Credenciales nuevas.** Siempre `{ id: "", name: "CONFIGURA: …" }`.
+- **Idempotente.** Blindar un workflow ya blindado no produce cambios.
+- **El filtro de entrada** traslada el prompt original a un nodo Code (`plantillaAJs`). Si el prompt usa funciones que solo existen en las expresiones de n8n, no se traslada y el hallazgo queda como guía manual.
+
+`puntoDeRebote(ruta, despues)` devuelve el primer paso de una ruta original cuyo hallazgo ya no existe: ahí rebota el ataque repetido. `limpiarParaCompartir(workflow)` devuelve una copia sin bloques de la instancia, con las credenciales como marcadores y `pinData` vacío.
+
+En la escena, `Ciudadela.transformar(previo, nuevo, alTerminar)` carga el análisis blindado y anima la diferencia: la muralla sube, las puertas que estaban abiertas se cierran, las llaves de los nodos corregidos vuelan a la bóveda, se despliega el escudo de las torres con `filtrado` y se levantan los edificios nuevos.
+
+En `vista.ts`, `a` es el análisis que se muestra (original o blindado) y `blindaje` guarda el resultado. `pintarPanel` reconstruye el panel completo a partir de `a`.
+
 ## Comandos
 
 ```
@@ -144,6 +172,7 @@ npm run dev        Servidor de desarrollo
 npm run build      Chequeo de tipos + sitio estático en dist/
 npm test           Pruebas (Vitest)
 npm run analizar -- ruta/al/workflow.json    Reporte en texto
+node scripts/blindar.mjs ruta/al/workflow.json --salida blindado.json    Blindaje desde la terminal
 node scripts/crear-ejemplos.mjs              Regenera los ejemplos
 ```
 

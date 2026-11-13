@@ -31,6 +31,26 @@ export function esFormularioPublico(ctx: Contexto, n: NodoN8n): boolean {
   return campos.size >= 2;
 }
 
+/** Nodos cercanos al webhook que limitan o revisan lo que llega (validación del formulario). */
+export function validadoresTrasWebhook(ctx: Contexto, webhook: string): string[] {
+  const hallados: string[] = [];
+  let frontera = [webhook];
+  const vistos = new Set<string>(frontera);
+  for (let salto = 0; salto < 2; salto++) {
+    const siguiente: string[] = [];
+    for (const actual of frontera) {
+      for (const a of ctx.grafo.sucesores(actual)) {
+        if (vistos.has(a.hacia)) continue;
+        vistos.add(a.hacia);
+        siguiente.push(a.hacia);
+        if (ctx.taint.esValidador(a.hacia)) hallados.push(a.hacia);
+      }
+    }
+    frontera = siguiente;
+  }
+  return hallados;
+}
+
 interface RevisionManual {
   nodo: string;
   campos: string[];
@@ -81,6 +101,8 @@ export function reglasPuertas(ctx: Contexto): Hallazgo[] {
     // PUE-1: webhook sin autenticación
     if (esWebhook(n) && entradaSinAutenticacion(n)) {
       if (esFormularioPublico(ctx, n)) {
+        // Un formulario que ya valida lo que llega no se reporta: se reconoce como fortaleza.
+        if (validadoresTrasWebhook(ctx, n.name).length) continue;
         hallazgos.push(
           crearHallazgo(ctx, {
             regla: 'PUE-1',

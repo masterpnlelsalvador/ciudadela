@@ -194,7 +194,7 @@ export function reglasLlaves(ctx: Contexto): Hallazgo[] {
           : `El nodo «${n.name}» guarda ${plural(campos.length, 'el campo', 'los campos')} ${nombres} como texto. Queda visible para cualquiera que abra el workflow, lo exporte o revise las ejecuciones.`,
         correccion:
           'Guarda el secreto en una credencial de n8n (por ejemplo Header Auth) y úsala desde los nodos HTTP Request. Así no aparece en el JSON ni en las ejecuciones.',
-        autocorregible: true,
+        autocorregible: campos.every((c) => !!c.ruta),
         datos: { campos },
       }),
     );
@@ -221,7 +221,7 @@ export function reglasLlaves(ctx: Contexto): Hallazgo[] {
         explicacion: `${lista(nodosLla3)} ${plural(nodosLla3.length, 'arma', 'arman')} ${plural(nombresHeader.length, 'el header', 'los headers')} ${nombresHeader.map((h) => `\`${h}\``).join(', ')} a mano, en vez de usar una credencial de n8n. El secreto viaja como un dato más del flujo y queda registrado en cada ejecución.`,
         correccion:
           'En cada HTTP Request elige Authentication → Generic Credential Type → Header Auth y guarda ahí el nombre del header y el secreto. n8n lo cifra y no lo muestra en las ejecuciones.',
-        autocorregible: true,
+        autocorregible: Object.values(porNodo).some((lista2) => lista2.some((e) => e.ruta.length === 3)),
         datos: { porNodo },
       }),
     );

@@ -124,6 +124,9 @@ export class Ciudadela {
   private seguido: THREE.Vector3 | null = null;
   private distanciaSeguimiento = 26;
   private tenidos = new Map<string, () => void>();
+  private grupoMuralla: THREE.Group | null = null;
+  /** Animaciones cortas en curso (transformación al blindar). */
+  private transiciones: Array<{ t0: number; dur: number; avanzar: (k: number) => void; alFinal?: () => void }> = [];
   private indiceCasa = new Map<string, number>();
 
   constructor(contenedor: HTMLElement, opciones: OpcionesCiudadela) {
@@ -261,7 +264,8 @@ export class Ciudadela {
   // -------------------------------------------------------------------------
   // Carga de un análisis
 
-  cargar(a: Analisis): void {
+  cargar(a: Analisis, opciones: { sinConstruccion?: boolean; conservarCamara?: boolean } = {}): void {
+    const camaraPrevia = opciones.conservarCamara && this.plano ? { p: this.camara.position.clone(), o: this.controles.target.clone() } : null;
     this.limpiar();
     const plano = calcularPlano(a.nodos);
     this.plano = plano;
@@ -332,9 +336,14 @@ export class Ciudadela {
 
     this.camaraMovida = false;
     this.encuadrar(true);
+    if (camaraPrevia) {
+      this.vuelo = null;
+      this.camara.position.copy(camaraPrevia.p);
+      this.controles.target.copy(camaraPrevia.o);
+    }
     this.inicioConstruccion = performance.now();
-    this.construyendo = !this.quieto;
-    this.aplicarConstruccion(this.quieto ? 99 : 0);
+    this.construyendo = !this.quieto && !opciones.sinConstruccion;
+    this.aplicarConstruccion(this.construyendo ? 0 : 99);
   }
 
   private limpiar(): void {
@@ -364,6 +373,8 @@ export class Ciudadela {
     this.seguido = null;
     this.tenidos.clear();
     this.indiceCasa.clear();
+    this.transiciones = [];
+    this.grupoMuralla = null;
     this.controles.enabled = true;
   }
 
@@ -458,7 +469,10 @@ export class Ciudadela {
         dientes.setMatrixAt(k++, this.aux.matrix);
       }
     });
-    ciudad.add(muro, dientes);
+    const grupoMuralla = new THREE.Group();
+    grupoMuralla.add(muro, dientes);
+    ciudad.add(grupoMuralla);
+    this.grupoMuralla = grupoMuralla;
 
     // Torreones de esquina (el del noreste es el faro del vigía, se construye aparte)
     for (const [x, z] of [
@@ -470,7 +484,7 @@ export class Ciudadela {
       g.add(this.malla(new THREE.CylinderGeometry(1.25, 1.45, 3.6, 8), this.solido(COLOR.piedra), 0, 1.8, 0));
       g.add(this.malla(new THREE.ConeGeometry(1.6, 1.5, 8), this.solido(COLOR.tejaAzul), 0, 4.35, 0));
       g.position.set(x, 0, z);
-      ciudad.add(g);
+      grupoMuralla.add(g);
     }
   }
 
@@ -564,7 +578,10 @@ export class Ciudadela {
       g.add(resplandor);
     } else if (!interna) {
       // Rastrillo bajado
-      for (let i = -2; i <= 2; i++) g.add(this.malla(new THREE.BoxGeometry(0.06, 2.3, 0.06), this.solido(0x1a2030, { metalness: 0.6, roughness: 0.4 }), i * 0.24, 1.16, 0.62, false));
+      const rastrillo = new THREE.Group();
+      for (let i = -2; i <= 2; i++) rastrillo.add(this.malla(new THREE.BoxGeometry(0.06, 2.3, 0.06), this.solido(0x1a2030, { metalness: 0.6, roughness: 0.4 }), i * 0.24, 1.16, 0.62, false));
+      g.add(rastrillo);
+      g.userData.rastrillo = rastrillo;
     }
     // Farol: rojo si está abierta, verde si pide credenciales, apagado si es interna
     const colorFarol = abierta ? COLOR_SEVERIDAD.critico : interna ? COLOR.apagado : COLOR.verde;
@@ -597,6 +614,20 @@ export class Ciudadela {
     const resplandor = new THREE.PointLight(COLOR.cristal, 22, 16, 1.6);
     resplandor.position.set(0, 5, 0);
     g.add(resplandor);
+    if (n.filtrado) {
+      const escudo = new THREE.Mesh(
+        new THREE.SphereGeometry(1, 20, 12, 0, Math.PI * 2, 0, Math.PI / 2),
+        new THREE.MeshBasicMaterial({ color: 0x7dffd8, transparent: true, opacity: 0.16, toneMapped: false, depthWrite: false, side: THREE.DoubleSide }),
+      );
+      escudo.scale.set(3.1, 9.6, 3.1);
+      const borde = new THREE.Mesh(new THREE.TorusGeometry(3.1, 0.05, 6, 40), this.luz(0x7dffd8, 0.7));
+      borde.rotation.x = Math.PI / 2;
+      borde.position.y = 0.08;
+      const grupoEscudo = new THREE.Group();
+      grupoEscudo.add(escudo, borde);
+      g.add(grupoEscudo);
+      g.userData.escudo = grupoEscudo;
+    }
     g.userData.esIA = true;
     return { nombre: n.nombre, x: p.x, z: p.z, alto: 9, radio: 1.9, grupo: g, retraso };
   }
@@ -937,6 +968,19 @@ export class Ciudadela {
       this.controles.target.lerpVectors(this.vuelo.o0, this.vuelo.o1, k);
       if (t >= 1) this.vuelo = null;
     }
+    if (this.transiciones.length) {
+      this.transiciones = this.transiciones.filter((tr) => {
+        const k = (ahora - tr.t0) / tr.dur;
+        if (k < 0) return true;
+        if (k >= 1) {
+          tr.avanzar(1);
+          tr.alFinal?.();
+          return false;
+        }
+        tr.avanzar(k);
+        return true;
+      });
+    }
     if (this.alCuadro) this.alCuadro(ahora);
     if (this.seguido && !this.vuelo) {
       // La cámara acompaña al punto seguido conservando su ángulo.
@@ -1141,6 +1185,92 @@ export class Ciudadela {
     this.camara.updateProjectionMatrix();
     // Si cambió la forma del lienzo y nadie ha movido la cámara, se vuelve a encuadrar.
     if (this.plano && !this.camaraMovida && Math.abs(previo - this.camara.aspect) > 0.05) this.encuadrar(false, true);
+  }
+
+  // -------------------------------------------------------------------------
+  // Acto 3: la ciudadela se transforma al blindar
+
+  /**
+   * Pasa del análisis original al blindado: suben las murallas, se cierran las puertas,
+   * las llaves vuelan a la bóveda, aparece el escudo sobre la torre de IA y se levantan
+   * los edificios nuevos. Al terminar llama a alTerminar.
+   */
+  transformar(previo: Analisis, nuevo: Analisis, alTerminar: () => void): void {
+    const puertasAbiertas = previo.nodos.filter((n) => n.sinAutenticacion).map((n) => n.nombre);
+    const conLlaves = previo.nodos.filter((n) => n.tieneLlaves).map((n) => n.nombre);
+    const existentes = new Set(previo.nodos.map((n) => n.nombre));
+    this.cargar(nuevo, { sinConstruccion: true });
+    if (this.quieto) {
+      alTerminar();
+      return;
+    }
+    const ahora = performance.now();
+    const nuevoPorNombre = new Map(nuevo.nodos.map((n) => [n.nombre, n]));
+    const transicion = (retraso: number, dur: number, avanzar: (k: number) => void, alFinal?: () => void) => {
+      avanzar(0);
+      this.transiciones.push({ t0: ahora + retraso, dur, avanzar, alFinal });
+    };
+
+    // Murallas que suben
+    const muralla = this.grupoMuralla;
+    if (muralla) transicion(0, 1300, (k) => (muralla.scale.y = 0.45 + 0.55 * rebote(k)));
+
+    // Puertas que se cierran
+    for (const nombre of puertasAbiertas) {
+      const n = nuevoPorNombre.get(nombre);
+      const g = this.edificios.get(nombre)?.grupo;
+      if (!n || n.sinAutenticacion || !g) continue;
+      const hojas = (g.userData.hojas as THREE.Group[] | undefined) ?? [];
+      const rastrillo = g.userData.rastrillo as THREE.Group | undefined;
+      transicion(250, 1200, (k) => {
+        const s = suave(k);
+        hojas.forEach((hoja, i) => (hoja.rotation.y = (i === 0 ? -1 : 1) * 1.95 * (1 - s)));
+        if (rastrillo) rastrillo.position.y = 2.5 * (1 - s);
+      });
+    }
+
+    // Llaves que vuelan a la bóveda
+    const boveda = this.edificios.get(ID_BOVEDA);
+    conLlaves.forEach((nombre, i) => {
+      const e = this.edificios.get(nombre);
+      const n = nuevoPorNombre.get(nombre);
+      if (!e || !boveda || !n || n.tieneLlaves) return;
+      const llave = this.llave();
+      const desde = new THREE.Vector3(e.x, e.alto + 1.5, e.z);
+      const hasta = new THREE.Vector3(boveda.x, 1.1, boveda.z + 1.3);
+      this.ciudad?.add(llave);
+      transicion(
+        500 + i * 220,
+        1500,
+        (k) => {
+          const s = suave(k);
+          llave.position.lerpVectors(desde, hasta, s);
+          llave.position.y += Math.sin(s * Math.PI) * 5;
+          llave.rotation.y = s * 9;
+          llave.scale.setScalar(1.25 * (1 - s * 0.6));
+        },
+        () => this.ciudad?.remove(llave),
+      );
+    });
+
+    // Escudos que se despliegan y edificios nuevos que se levantan
+    for (const [nombre, e] of this.edificios) {
+      const escudo = e.grupo?.userData.escudo as THREE.Group | undefined;
+      if (escudo) transicion(900, 1100, (k) => escudo.scale.setScalar(Math.max(0.001, rebote(k))));
+      // Solo los edificios nuevos se levantan; los que ya existían se quedan como están.
+      const esNuevo = !existentes.has(nombre) && nombre !== ID_BOVEDA && nombre !== ID_FARO;
+      e.retraso = esNuevo ? 0.7 : -5;
+    }
+    const nombreDeCasa = new Map([...this.indiceCasa.entries()].map(([nombre, indice]) => [indice, nombre]));
+    this.casas.forEach((c, i) => {
+      const nombre = nombreDeCasa.get(i);
+      c.retraso = nombre && !existentes.has(nombre) ? 0.7 : -5;
+    });
+    this.inicioConstruccion = ahora;
+    this.construyendo = true;
+    this.aplicarConstruccion(0);
+
+    transicion(2500, 50, () => undefined, alTerminar);
   }
 
   // -------------------------------------------------------------------------

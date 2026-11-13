@@ -96,3 +96,29 @@ Dos rutas pueden compartir título (dos descargas con URL del mensaje). Los boto
 
 **D30. Duración máxima de 24 segundos.**
 El prompt pide menos de 30. Las rutas largas se comprimen en el tiempo en lugar de recortar pasos.
+
+## Fase 4: blindaje
+
+**D31. POD-1: borrador antes que aprobación humana, y dato verificado solo si existe.**
+El prompt da tres opciones en orden. La primera (tomar el destinatario de un dato verificado) solo se aplica cuando el canal de la herramienta y el del trigger coinciden (herramienta de Telegram con trigger de Telegram: se usa el chat que identificó la plataforma). Para Gmail no hay en el flujo un correo verificado de la persona, así que se pasa a la segunda: crear un borrador. El cambio explica por qué. La tercera (aprobación humana) no se automatiza: queda como guía manual.
+
+**D32. POD-2 usa la clave de sesión de la memoria como identificador verificado.**
+Si el agente ya separa las conversaciones con un identificador (la `sessionKey` de su memoria), ese es el dato que la persona no puede elegir. Se agrega como columna de búsqueda a la herramienta que modifica, y como columna guardada a las herramientas que crean registros en la misma hoja. Si no hay memoria, se usa el chat de un trigger de Telegram. Si no hay ninguno, queda manual.
+
+**D33. El host esperado de TUN-1 se toma del propio workflow.**
+Primero de una URL fija en un nodo de configuración (Set); si no, del host fijo de otro HTTP Request; si no hay ninguno, queda un marcador y se avisa de que las descargas no saldrán hasta escribirlo. La comprobación usa `url.split('/')[2]` en lugar de `new URL()`, que no está garantizado dentro de las expresiones de n8n; compara la autoridad completa, así que un `usuario@otro-host` no pasa.
+
+**D34. El filtro de entrada solo se inserta si el prompt se puede trasladar sin riesgo.**
+El filtro es un nodo Code y las expresiones de n8n tienen funciones que el Code no (`.removeTags()`, `.last()`, `$if`…). Si el prompt usa alguna, Ciudadela no lo toca y el hallazgo sigue como guía manual. Mejor no corregir que romper el flujo.
+
+**D35. Formularios públicos: validación, nunca un secreto.**
+Se inserta un IF con tres condiciones (campo trampa `website` vacío, tamaño máximo y formato de correo si el flujo usa un campo de correo) y, si el webhook responde con un nodo, una respuesta 400 para los rechazados. La verificación anti-bots vive en la página del usuario, así que va en "qué debes configurar".
+
+**D36. El blindaje quita los rastros de exportación, pero no el `staticData`.**
+`activeVersion`, `shared` y `meta.instanceId` no hacen falta para importar. `staticData` guarda el estado de triggers por sondeo, así que solo lo quita "Limpiar para compartir".
+
+**D37. Después de blindar puede quedar una ruta de tipo "tesoro".**
+Si el workflow envía datos personales a un proveedor de IA, el blindaje no lo cambia (es una decisión del negocio). El panel la muestra como "Recorrido de datos personales", no como "Ruta de ataque", y el ataque original se sigue mostrando rebotando.
+
+**D38. La fecha del reporte la pone la interfaz.**
+`reporteMarkdown` recibe la fecha como parámetro para que el motor siga sin leer el reloj.

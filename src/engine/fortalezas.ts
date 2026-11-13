@@ -7,6 +7,7 @@ import { usaCredencialesHttp } from './reglas/llaves.ts';
 import { esWorkflowDeErrores, llamadasExternas, tieneErrorWorkflow } from './reglas/vigias.ts';
 import { esExpresion } from './expresiones.ts';
 import { entradasDeIA } from './reglas/mensajes.ts';
+import { esFormularioPublico, validadoresTrasWebhook } from './reglas/puertas.ts';
 import { codigoDe, esCodigo } from './clasificar.ts';
 import { quitarComentarios } from './contaminacion.ts';
 
@@ -22,6 +23,19 @@ export function buscarFortalezas(ctx: Contexto): Fortaleza[] {
       titulo: 'Webhook con autenticación',
       detalle: `${lista(webhooksConAuth)} ${plural(webhooksConAuth.length, 'pide', 'piden')} una credencial a quien ${plural(webhooksConAuth.length, 'lo', 'los')} llama.`,
       nodos: webhooksConAuth,
+    });
+  }
+
+  // Formularios públicos que validan lo que llega
+  for (const n of ctx.activos) {
+    if (!esWebhook(n) || !entradaSinAutenticacion(n) || !esFormularioPublico(ctx, n)) continue;
+    const validadores = validadoresTrasWebhook(ctx, n.name);
+    if (!validadores.length) continue;
+    fortalezas.push({
+      codigo: 'F-FORMULARIO',
+      titulo: 'Valida el formulario antes de usarlo',
+      detalle: `${lista(validadores)} ${plural(validadores.length, 'revisa', 'revisan')} lo que llega por «${n.name}» antes de guardarlo o enviarlo. Complétalo con una verificación anti-bots en tu página.`,
+      nodos: validadores,
     });
   }
 

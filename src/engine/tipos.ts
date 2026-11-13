@@ -168,6 +168,8 @@ export interface NodoAnalizado {
   usaCredenciales: boolean;
   tieneReintentos: boolean;
   esExterno: boolean;
+  /** Nodo de IA cuyo contenido de fuera pasa antes por un filtro (escudo sobre la torre). */
+  filtrado: boolean;
 }
 
 export interface AristaAnalizada {

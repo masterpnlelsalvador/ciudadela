@@ -1,7 +1,7 @@
 // Punto de entrada. Todo el análisis ocurre aquí, en el navegador: no hay peticiones
 // a terceros ni se envía el workflow a ningún servidor.
 import './estilos.css';
-import { ErrorDeFormato, analizar } from './engine/index.ts';
+import { ErrorDeFormato, analizarWorkflow, leerWorkflow } from './engine/index.ts';
 import { crearInicio } from './ui/inicio.ts';
 import type { Ejemplo } from './ui/inicio.ts';
 import { crearVista } from './ui/vista.ts';
@@ -36,9 +36,10 @@ function mostrarInicio(): void {
 }
 
 function mostrarCiudadela(texto: string, ejemplo?: Ejemplo): void {
-  const analisis = analizar(texto);
+  const { workflow, avisos } = leerWorkflow(texto);
+  const analisis = analizarWorkflow(workflow, avisos);
   vista?.destruir();
-  vista = crearVista({ analisis, esEjemplo: !!ejemplo }, { alVolver: mostrarInicio });
+  vista = crearVista({ workflow, analisis, esEjemplo: !!ejemplo }, { alVolver: mostrarInicio });
   raiz.replaceChildren(vista.el);
   document.title = `${analisis.nombre} · Ciudadela`;
 }

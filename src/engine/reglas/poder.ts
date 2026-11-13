@@ -5,6 +5,7 @@ import { crearHallazgo } from '../contexto.ts';
 import { codigoDe, esCorreo, esEnvio, esHttp, modificaDatos, texto, tipoCorto } from '../clasificar.ts';
 import { esExpresion, refsDeValor, usaFromAI } from '../expresiones.ts';
 import { quitarComentarios } from '../contaminacion.ts';
+import { opcionParaPod1, opcionParaPod2 } from '../blindar.ts';
 
 const PARAM_DESTINATARIO = /^(sendTo|toEmail|to|toList|chatId|channelId|channel|phoneNumber|recipientPhoneNumber|toPhoneNumber|user|userId|email|toRecipients|recipient|recipients|cc|bcc|ccList|bccList)$/i;
 const PARAM_CONTENIDO = /^(message|text|subject|body|htmlMessage|html|content|caption|messageText|bodyContent|textBody)$/i;
@@ -113,7 +114,7 @@ export function reglasPoder(ctx: Contexto): Hallazgo[] {
                   : 'Si el modelo se equivoca o recibe instrucciones manipuladas, puede escribir desde la cuenta de tu negocio a quien no corresponde.'),
               correccion:
                 'Toma el destinatario de un dato verificado del flujo (por ejemplo, el contacto que ya identificó la plataforma) en lugar de dejarlo al modelo. Si no existe ese dato, crea un borrador en vez de enviar, o agrega un paso de aprobación humana.',
-              autocorregible: true,
+              autocorregible: opcionParaPod1(ctx.wf, t) !== null,
               datos: {
                 agente: agente.name,
                 rutasDestino: destinoIA.map((p) => p.ruta),
@@ -132,7 +133,7 @@ export function reglasPoder(ctx: Contexto): Hallazgo[] {
                 nodos: [t.name],
                 explicacion: `«${t.name}» avisa a un destinatario fijo con un texto que redacta el modelo, sin límite de tamaño. Alguien insistente podría hacer que el agente llene de avisos a tu equipo.`,
                 correccion: 'Limita la longitud del texto (por ejemplo, 500 caracteres) y, si puedes, la frecuencia de avisos por conversación.',
-                autocorregible: true,
+                autocorregible: contenidoIA.every((p) => /^=\s*\{\{[\s\S]*\}\}\s*$/.test(p.valor)),
                 datos: { agente: agente.name, rutasContenido: contenidoIA.map((p) => p.ruta) },
               }),
             );
@@ -190,7 +191,7 @@ export function reglasPoder(ctx: Contexto): Hallazgo[] {
           explicacion,
           correccion:
             'Exige además un identificador que asigne la plataforma y que el usuario no pueda elegir (por ejemplo, el chat_id o el id de la conversación), y úsalo junto con el dato que da la persona.',
-          autocorregible: buscaPor.length > 0,
+          autocorregible: opcionParaPod2(ctx.wf, t, agente.name) !== null,
           datos: { agente: agente.name, buscaPor, operacion: op },
         }),
       );

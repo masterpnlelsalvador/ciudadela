@@ -6,6 +6,7 @@ import type { Marca } from '../contaminacion.ts';
 import { tomaElMensajeDelChat } from '../contaminacion.ts';
 import { esIA } from '../clasificar.ts';
 import { esExpresion } from '../expresiones.ts';
+import { plantillaAJs } from '../blindar.ts';
 
 export interface EntradasDeIA {
   /** Marcas que llegan al prompt (mensaje del usuario). */
@@ -76,6 +77,15 @@ export function reglasMensajes(ctx: Contexto): Hallazgo[] {
     const { prompt, sistema, rutasPrompt } = entradasDeIA(ctx, n);
     const herramientas = ctx.grafo.subnodos(n.name, 'ai_tool').filter((t) => !ctx.porNombre.get(t)?.disabled);
 
+    // El filtro de entrada se puede insertar solo si el prompt se traslada sin riesgo a un nodo Code.
+    const filtrable = rutasPrompt.length
+      ? rutasPrompt.every((ruta) => {
+          let valor: unknown = n.parameters;
+          for (const paso of ruta) valor = valor && typeof valor === 'object' ? (valor as Record<string, unknown>)[paso] : undefined;
+          return typeof valor === 'string' && plantillaAJs(valor) !== null;
+        })
+      : tomaElMensajeDelChat(n);
+
     const directas = prompt.filter((m) => m.clase === 'directo' && sinRevisar(m));
     const extraidas = prompt.filter((m) => m.clase === 'extraido' && sinRevisar(m));
     const externas = prompt.filter((m) => m.clase === 'externo' && sinRevisar(m));
@@ -97,7 +107,7 @@ export function reglasMensajes(ctx: Contexto): Hallazgo[] {
               : ' Sin herramientas, el daño se limita a respuestas indebidas.'),
           correccion:
             'Pon un filtro antes de la IA que limite la longitud, quite caracteres de control y envuelva el mensaje entre delimitadores, y dile al modelo en sus instrucciones que ese contenido son datos, no órdenes. Reduce el riesgo; no lo elimina.',
-          autocorregible: true,
+          autocorregible: filtrable,
           datos: { fuentes, rutasPrompt, herramientas },
         }),
       );
@@ -120,7 +130,7 @@ export function reglasMensajes(ctx: Contexto): Hallazgo[] {
             : `«${n.name}» recibe contenido que trae ${lista(origenes)} desde un sistema externo. Si quien controla ese contenido no es de tu confianza, puede incluir instrucciones para el modelo. Verifica de dónde viene.`,
           correccion:
             'Trata ese contenido como datos: limítalo, envuélvelo entre delimitadores antes de dárselo al modelo y no permitas que dispare herramientas sensibles sin confirmación.',
-          autocorregible: true,
+          autocorregible: filtrable,
           datos: { origenes, rutasPrompt, herramientas },
         }),
       );

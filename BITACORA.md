@@ -105,3 +105,39 @@ Fecha: 13 de noviembre de 2026. Dirección visual de la fase 2 aprobada por Dieg
 
 - Ejemplo 1: la ruta principal completa (9 pasos) y el resumen final, sin errores en consola.
 - Ejemplo 3: el intruso rebota en la puerta y aparece el mensaje de resistencia.
+
+## Fase 4: blindaje, exportación, "Ver cambios", "Limpiar para compartir" y reporte Markdown
+
+Fecha: 13 de noviembre de 2026.
+
+### Qué se hizo
+
+- `blindar()`: genera el workflow corregido con las correcciones mínimas del prompt, la lista de cambios, lo que hay que configurar y lo que queda pendiente.
+- `limpiarParaCompartir()`: copia sin bloques de la instancia, con credenciales como marcadores y `pinData` vacío.
+- `reporteMarkdown()`: reporte completo, con antes y después si ya se blindó.
+- `scripts/blindar.mjs`: lo mismo desde la terminal.
+- Acto 3 en la web: botón "Blindar la ciudadela", transformación animada, puntaje que sube del valor anterior al nuevo, ataque original repetido que rebota, y los botones "Descargar JSON blindado", "Copiar", "Ver cambios", "Descargar reporte (Markdown)" y "Limpiar para compartir". Se puede alternar entre la ciudadela original y la blindada.
+- Pruebas: 166 pasan, 8 omitidas. Las nuevas comprueban, para los tres ejemplos y los siete fixtures privados, que el JSON blindado es válido, que todas las conexiones apuntan a nodos existentes, que nombres e ids son únicos, que los nodos existentes conservan id, tipo y posición, que no se inventan secretos, que lo anunciado como autocorregible desaparece, que el puntaje no baja y que blindar dos veces no cambia nada.
+
+### Resultados del blindaje
+
+| Workflow | Seguridad | Lógica | Cambios | Pendientes |
+|---|---|---|---|---|
+| Ejemplo 1, clínica dental | 0 → 92 | 100 → 100 | 11 | 2 |
+| Ejemplo 2, formulario de leads | 84 → 98 | 82 → 94 | 5 | 2 |
+| Ejemplo 3, bien blindado | 100 → 100 | 100 → 100 | 0 | 0 |
+| Telegram (real) | 23 → 94 | 100 → 100 | 6 | 1 |
+| 01 cerebro del agente (real) | 5 → 94 | 100 → 100 | 5 | 1 |
+| 02 enviar material (real) | 96 → 98 | 100 → 100 | 1 | 1 |
+
+### Qué falló y cómo se corrigió
+
+1. **La animación de construcción peleaba con la de transformación.** Al blindar, los edificios nuevos se levantan con la animación de construcción, pero esa animación también volvía a levantar desde cero los edificios que ya existían. Corrección: al transformar, los edificios existentes se marcan como ya construidos y solo los nuevos se animan.
+2. **La simulación se detenía en ventanas en segundo plano.** El arreglo de la fase 3 descartaba los cuadros separados por más de 1,5 segundos; si el navegador dibuja menos de un cuadro cada 1,5 segundos, no avanzaba nunca. Ahora esos cuadros avanzan un cuarto de segundo.
+3. **Los scripts en línea volvieron a fallar por el escapado de Bash.** Los parches con comillas y acentos graves dentro de un heredoc no se podían ni interpretar. Desde aquí, los parches se escriben en un archivo y se ejecutan desde ahí.
+4. **Nombres de credencial con comillas anidadas** ("«CONFIGURA: Header Auth «api_access_token»»"). Ahora el nombre del header va entre paréntesis.
+
+### Qué no hace el blindaje (y lo dice)
+
+- No toca MEN-3, POD-4, TUN-2, TUN-3, TUN-4, TUN-5, CIM-3, LLA-1 ni TES-1: quedan como pendientes con su guía.
+- No verifiqué la importación del JSON blindado en una instancia real de n8n. Las pruebas cubren la estructura; la importación queda para Diego, como indica el prompt.

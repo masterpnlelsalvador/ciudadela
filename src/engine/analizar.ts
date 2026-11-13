@@ -29,7 +29,7 @@ import {
 } from './clasificar.ts';
 import { reglasPuertas } from './reglas/puertas.ts';
 import { reglasLlaves, usaCredencialesHttp } from './reglas/llaves.ts';
-import { reglasMensajes } from './reglas/mensajes.ts';
+import { entradasDeIA, reglasMensajes } from './reglas/mensajes.ts';
 import { reglasPoder } from './reglas/poder.ts';
 import { reglasTesoro } from './reglas/tesoro.ts';
 import { reglasTuneles } from './reglas/tuneles.ts';
@@ -153,6 +153,11 @@ export function analizarWorkflow(wf: WorkflowN8n, avisos: string[] = []): Analis
       usaCredenciales: (!!n.credentials && Object.keys(n.credentials).length > 0) || (esHttp(n) && usaCredencialesHttp(n)),
       tieneReintentos: n.retryOnFail === true,
       esExterno: !ctx.grafo.esSubnodo(n.name) && esLlamadaExterna(n),
+      filtrado:
+        esIA(n) &&
+        !ctx.grafo.esSubnodo(n.name) &&
+        !propios.some((h) => h.regla === 'MEN-1' || h.regla === 'MEN-2') &&
+        entradasDeIA(ctx, n).prompt.some((m) => m.validado && !m.porIA),
     };
   });
 

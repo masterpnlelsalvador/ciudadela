@@ -194,7 +194,7 @@ export class Simulacion {
   private cuadro(ahora: number): void {
     // Un salto largo significa que la pestaña estuvo oculta: ese tiempo no cuenta.
     const transcurrido = this.previo ? (ahora - this.previo) / 1000 : 0;
-    const dt = transcurrido > 1.5 ? 0 : transcurrido;
+    const dt = transcurrido > 1.5 ? 0.25 : transcurrido;
     this.previo = ahora;
     this.reloj += dt;
     const t = this.reloj;

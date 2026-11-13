@@ -257,7 +257,7 @@ export function reglasTesoro(ctx: Contexto): Hallazgo[] {
         explicacion: `La memoria «${n.name}» elige qué conversación cargar con un identificador que llega en el mensaje de ${lista(fuentes)}, una entrada sin autenticación. Una petición falsa con el identificador de otra conversación haría que el agente cargue el historial de otro cliente.`,
         correccion:
           'Autentica la entrada: así el identificador de conversación solo puede venir del sistema legítimo. Si usas un canal como Telegram o WhatsApp, usa el identificador que asigna la plataforma.',
-        autocorregible: true,
+        autocorregible: fuentes.every((f) => ctx.porNombre.get(f)?.type === 'n8n-nodes-base.webhook'),
         datos: { fuentes, agente: ctx.grafo.raizDe(n.name) },
       }),
     );
