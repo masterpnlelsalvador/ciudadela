@@ -53,3 +53,29 @@ LLA-1 muestra los primeros caracteres y la longitud. Las pruebas arman secretos 
 
 **D17. El ejemplo 3 saca 100, no "90 o más por poco".**
 Se diseñó sin nombres de campo de datos personales para que no aparezca una ruta de tipo "tesoro" y la ciudadela resista de verdad.
+
+## Fase 2: ciudadela 3D
+
+**D18. La cámara mira desde el sur.**
+El canvas de n8n se lee de izquierda a derecha. Con la cámara al sur, la x de n8n es la x de la pantalla y la y de n8n queda hacia el espectador: quien conoce su workflow reconoce su forma de inmediato.
+
+**D19. Las puertas se llevan a la muralla.**
+Un trigger se mueve al tramo de muralla más cercano a su posición. Se pierde un poco de fidelidad con el canvas a cambio de que la metáfora sea literal: se entra por una puerta, y la puerta está abierta o cerrada.
+
+**D20. La severidad se lee en tres capas.**
+Anillo en el suelo (se ve desde cualquier ángulo), grietas en el edificio (a partir de nivel medio) y, para Llaves, una llave flotando. Los hallazgos informativos no marcan el edificio.
+
+**D21. Dos símbolos no son nodos: la bóveda y el faro.**
+La bóveda representa las credenciales de n8n y el faro el workflow de errores. Son clicables y abren la explicación de su defensa. Sus datos salen del análisis (número de nodos con credenciales, fortaleza F-VIGIA).
+
+**D22. Los ejemplos se cargan con `fetch` del mismo origen.**
+"Sin peticiones de red" se interpreta como "sin peticiones a terceros": los ejemplos y, más adelante, `estudio.json` son archivos estáticos del mismo sitio. El JSON del usuario nunca se envía a ningún lado. En la fase 6 se agregará una política CSP en `netlify.toml` que lo impone técnicamente.
+
+**D23. Sin fuentes externas.**
+Titulares con serif del sistema (Iowan, Palatino, Georgia) y cuerpo con la fuente de interfaz del sistema. Cargar una fuente web sería una petición a un tercero.
+
+**D24. Ningún dato del workflow se inserta como HTML.**
+Los nombres de nodos vienen del JSON del usuario. La interfaz los inserta siempre con `textContent`; `innerHTML` solo se usa con iconos SVG definidos en el código.
+
+**D25. Los pasos de tránsito de una ruta se agrupan en el panel.**
+"Pasa por 6 nodos sin que nadie lo revise" en una línea, en vez de seis líneas iguales. Los pasos con regla se muestran siempre.

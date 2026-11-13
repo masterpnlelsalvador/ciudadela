@@ -48,3 +48,37 @@ Fecha: 12 de noviembre de 2026.
 
 - El blindaje, "Limpiar para compartir" y el reporte Markdown (fase 4). Los hallazgos ya indican si serán autocorregibles.
 - El estudio de plantillas (fase 5).
+
+## Fase 2: ciudadela 3D estática con interacción
+
+Fecha: 12 de noviembre de 2026.
+
+### Qué se hizo
+
+- Pantalla inicial: título, lema, zona para pegar o arrastrar el JSON, botón para elegir archivo, tres ejemplos etiquetados como ejemplos y el aviso de privacidad.
+- Acto 1 completo: la ciudadela 3D con el panel del reporte (puntaje de seguridad, salud de la lógica, "¿Cómo se calcula?", las 8 defensas con su estado, la ruta de ataque principal, hallazgos, lógica y fortalezas).
+- Interacción: nombre y rol al pasar el cursor, clic en un edificio para ver el nodo y sus hallazgos, clic en un hallazgo para enfocar sus nodos, clic en una defensa para filtrar.
+- Los actos 2 y 3 aparecen en la barra como "próxima fase".
+- `npm run build` genera el sitio estático (832 kB de JS, 225 kB comprimido; casi todo es three.js).
+
+Capturas en `docs/capturas/`.
+
+### Qué falló y cómo se corrigió
+
+1. **La primera versión era casi negra.** Con la luz de luna y el cielo a intensidades "realistas" de noche, los edificios no se distinguían. Corrección: más luz hemisférica y de luna, exposición más alta y piedra más clara. Sigue siendo de noche, pero se lee.
+2. **Todo se veía azul.** Al subir la luz, el suelo, la muralla y las casas quedaron del mismo tono. Corrección: piedra más neutra, suelo exterior más oscuro para que la meseta destaque, y tejados y ventanas cálidos para dar contraste.
+3. **La ciudad se veía pequeña.** La escala inicial (50 px por unidad) dejaba mucho espacio entre edificios. Corrección: 64 px por unidad y un encuadre más ajustado.
+4. **El encuadre cortaba las esquinas.** El cálculo usaba el ancho de la ciudad a la distancia del centro, pero el tramo de muralla más cercano a la cámara se ve más ancho por la perspectiva. Corrección: el encuadre considera ese tramo.
+5. **La etiqueta de la bóveda tapaba la de la puerta.** Las dos estaban en la esquina noroeste. Corrección: la bóveda se movió al muro del fondo.
+6. **El panel de detalle tapaba el edificio elegido** cuando estaba a la derecha. Corrección: el panel se abre del lado contrario al clic.
+7. **En móvil la cámara no se reencuadraba** al cambiar el tamaño del lienzo. Corrección: se reencuadra sola mientras la persona no haya movido la cámara.
+
+### Verificado en el navegador
+
+- Los tres ejemplos y el fixture real de Telegram (39 nodos) cargan sin errores en consola.
+- Clic y hover responden; el panel de detalle muestra los hallazgos correctos.
+- A 375 px de ancho no hay desborde horizontal y el reporte se lee debajo de la ciudadela.
+
+### Pendiente de aprobación
+
+La dirección visual. El prompt pide detenerse aquí antes de seguir con la simulación de ataque.

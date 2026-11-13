@@ -2,7 +2,7 @@
 
 Ciudadela audita la seguridad de workflows de n8n con análisis estático. Todo corre en el navegador: no hay backend, ni analítica, ni peticiones de red en tiempo de ejecución.
 
-Estado: fase 1 terminada (motor de análisis, reporte en texto y pruebas). Ver `BITACORA.md`.
+Estado: fases 1 y 2 terminadas (motor de análisis y ciudadela 3D estática con interacción). Ver `BITACORA.md`.
 
 ## Mapa del repositorio
 
@@ -22,6 +22,17 @@ src/engine/           Motor de análisis. Sin DOM. Lo usan la web, las pruebas y
   analizar.ts         Orquestador: contexto → reglas → rutas → puntajes → Analisis.
   reporte.ts          Reporte en texto plano.
   index.ts            API pública del motor.
+src/main.ts           Punto de entrada: alterna entre la pantalla inicial y la vista de la ciudadela.
+src/estilos.css       Hoja de estilos única. Sin fuentes externas.
+src/ui/
+  inicio.ts           Pantalla inicial: pegar, arrastrar o elegir archivo, y los tres ejemplos.
+  vista.ts            Acto 1: barra, panel del reporte, escenario 3D y detalle del nodo.
+  dom.ts              Utilidades de DOM (todo dato del workflow entra como texto, nunca como HTML).
+  iconos.ts           Iconos SVG de las defensas.
+src/escena/
+  plano.ts            Posiciones de n8n → parcelas, muralla y puertas.
+  ciudadela.ts        Clase Ciudadela (three.js): edificios, símbolos, cámara e interacción.
+  paleta.ts           Colores y nombres de los roles.
 scripts/
   analizar.mjs        Reporte en texto desde la terminal.
   crear-ejemplos.mjs  Genera los tres ejemplos de public/ejemplos/.
@@ -88,9 +99,36 @@ Puntaje: `100 − Σ pesos` con mínimo 0 (crítico 25, alto 12, medio 6, bajo 2
 3. Agrega una prueba positiva y una negativa en `tests/reglas/`.
 4. Si la regla abre un tipo de ruta nuevo, agrégalo en `rutas.ts`.
 
+## Ciudadela 3D
+
+`src/escena/ciudadela.ts` recibe un `Analisis` y construye la ciudad. No vuelve a analizar nada: todo lo que dibuja sale de `analisis.nodos`, `analisis.aristas`, `analisis.hallazgos` y `analisis.fortalezas`.
+
+**Plano.** `calcularPlano` escala las posiciones del canvas de n8n (64 px por unidad), las centra, separa los nodos encimados y levanta una muralla rectangular alrededor. Cada trigger se lleva al tramo de muralla más cercano y se convierte en puerta. La cámara mira desde el sur, así la ciudad se lee igual que el canvas: de izquierda a derecha.
+
+**Edificios por rol** (`NodoAnalizado.rol`):
+
+| Rol | Edificio | Qué muestra |
+|---|---|---|
+| entrada | Puerta en la muralla | Hojas abiertas, luz y farol rojo si no pide credenciales; rastrillo y farol verde si las pide |
+| ia | Torre de cristal | Siempre la más alta |
+| herramienta | Taller | Unido a su torre por un puente de luz |
+| modelo, memoria | Brasero, archivo | Unidos a su torre |
+| salida | Torre de vigía | Faro encendido si el nodo reintenta |
+| transformacion | Casa baja | Tejado azul para lógica, verde para código, rojo para el resto |
+
+**Símbolos de las defensas.** Anillo en el suelo y grietas del color del peor hallazgo del nodo; llaves doradas flotando sobre los nodos con hallazgos de Llaves; bóveda que brilla si hay nodos con credenciales de n8n; faro del vigía en la esquina noreste, encendido si hay workflow de errores.
+
+**Rendimiento.** Las casas, sus tejados y ventanas, los tramos de muralla, las almenas, los caminos y las partículas son `InstancedMesh`. Los edificios singulares son grupos pequeños. La selección usa cajas invisibles que no están en la escena.
+
+**Interacción.** `alPasar` (nombre bajo el cursor) y `alElegir` (clic) avisan a `vista.ts`, que pinta el globo y el panel de detalle. `enfocar(nombres)` levanta haces de luz y acerca la cámara. `lugarDe(nombre)` devuelve la posición de un edificio; lo usará la simulación de la fase 3.
+
+**Accesibilidad.** Con `prefers-reduced-motion` no hay animación de construcción, vuelos de cámara ni partículas en movimiento. Si no hay WebGL, la vista muestra solo el reporte (la vista plano 2D llega en la fase 6).
+
 ## Comandos
 
 ```
+npm run dev        Servidor de desarrollo
+npm run build      Chequeo de tipos + sitio estático en dist/
 npm test           Pruebas (Vitest)
 npm run analizar -- ruta/al/workflow.json    Reporte en texto
 node scripts/crear-ejemplos.mjs              Regenera los ejemplos
