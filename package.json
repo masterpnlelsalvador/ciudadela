@@ -1,0 +1,30 @@
+{
+  "name": "ciudadela",
+  "private": true,
+  "version": "0.1.0",
+  "description": "Audita la seguridad de workflows de n8n y la hace visible como una ciudadela 3D. Todo corre en el navegador.",
+  "type": "module",
+  "engines": {
+    "node": ">=23.6"
+  },
+  "scripts": {
+    "dev": "vite",
+    "build": "tsc --noEmit && vite build",
+    "preview": "vite preview",
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "analizar": "node scripts/analizar.mjs",
+    "estudio": "node scripts/estudio-plantillas.mjs"
+  },
+  "dependencies": {
+    "acorn": "^8.19.0",
+    "three": "^0.187.0"
+  },
+  "devDependencies": {
+    "@types/node": "^26.6.6",
+    "@types/three": "^0.187.0",
+    "typescript": "^7.0.2",
+    "vite": "^8.3.8",
+    "vitest": "^5.1.0"
+  }
+}

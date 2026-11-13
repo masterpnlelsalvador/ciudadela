@@ -1,0 +1,17 @@
+[
+  {
+    "archivo": "clinica-dental-whatsapp.json",
+    "titulo": "Agente de WhatsApp de una clínica dental",
+    "resumen": "Un agente con herramientas detrás de un webhook abierto. La ruta de ataque más clara."
+  },
+  {
+    "archivo": "formulario-leads-agencia.json",
+    "titulo": "Formulario de leads de una agencia",
+    "resumen": "Un formulario público con errores de lógica que pierden datos en silencio."
+  },
+  {
+    "archivo": "workflow-bien-blindado.json",
+    "titulo": "Workflow bien blindado",
+    "resumen": "Credenciales de n8n, reintentos, workflow de errores y validación antes del agente."
+  }
+]
