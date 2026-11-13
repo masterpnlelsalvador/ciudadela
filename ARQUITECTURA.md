@@ -2,7 +2,7 @@
 
 Ciudadela audita la seguridad de workflows de n8n con análisis estático. Todo corre en el navegador: no hay backend, ni analítica, ni peticiones de red en tiempo de ejecución.
 
-Estado: fases 1 a 4 terminadas (motor de análisis, ciudadela 3D, simulación de ataque y blindaje). Ver `BITACORA.md`.
+Estado: fases 1 a 5 terminadas (motor, ciudadela 3D, simulación, blindaje y estudio de plantillas). Ver `BITACORA.md`.
 
 ## Mapa del repositorio
 
@@ -30,6 +30,7 @@ src/ui/
   vista.ts            Acto 1: barra, panel del reporte, escenario 3D y detalle del nodo.
   dom.ts              Utilidades de DOM (todo dato del workflow entra como texto, nunca como HTML).
   iconos.ts           Iconos SVG de las defensas.
+  estudio.ts          Sección "Lo que encontramos en N plantillas públicas" (lee estudio.json).
 src/escena/
   plano.ts            Posiciones de n8n → parcelas, muralla y puertas.
   ciudadela.ts        Clase Ciudadela (three.js): edificios, símbolos, cámara e interacción.
@@ -38,6 +39,7 @@ src/escena/
 scripts/
   analizar.mjs        Reporte en texto desde la terminal.
   blindar.mjs         Blinda un workflow desde la terminal y escribe el JSON corregido.
+  estudio-plantillas.mjs  Estudio de plantillas públicas → public/estudio.json.
   crear-ejemplos.mjs  Genera los tres ejemplos de public/ejemplos/.
 public/ejemplos/      Ejemplos sintéticos + ESPERADO.md + indice.json.
 tests/                Vitest: unitarias por regla, ejemplos y pruebas de oro.
@@ -165,6 +167,19 @@ En la escena, `Ciudadela.transformar(previo, nuevo, alTerminar)` carga el análi
 
 En `vista.ts`, `a` es el análisis que se muestra (original o blindado) y `blindaje` guarda el resultado. `pintarPanel` reconstruye el panel completo a partir de `a`.
 
+## Estudio de plantillas
+
+`scripts/estudio-plantillas.mjs` usa la API pública de plantillas de n8n:
+
+- `GET /templates/search?rows=100&page=N&sort=views:desc` devuelve `{ totalWorkflows, workflows: [{ id, totalViews, price, … }] }`.
+- `GET /templates/workflows/<id>` devuelve `{ workflow: { …, workflow: { nodes, connections, settings, … } } }`. El JSON importable está en `workflow.workflow`.
+
+Pasos: (1) toma las N plantillas gratuitas más vistas; (2) elige páginas al azar del listado completo con un generador con semilla y saca hasta 8 plantillas por página; (3) descarga cada plantilla, con caché en `.cache/plantillas/` y 550 ms entre peticiones; (4) llama a `leerWorkflow` y `analizarWorkflow` de `src/engine/index.ts`, el mismo módulo que importa la web; (5) escribe solo agregados.
+
+`public/estudio.json` contiene: fecha, método, total y cinco resúmenes (`todas`, `masVistas`, `alAzar`, `conAgenteDeIA`, `sinAgenteDeIA`), cada uno con medianas, porcentaje con hallazgos altos o críticos, porcentaje con ruta de ataque y porcentaje de plantillas con cada regla y cada fortaleza. No hay nombres, autores ni ids.
+
+`src/ui/estudio.ts` pide `./estudio.json` y, si existe, pinta cuatro cifras y la metodología en la pantalla inicial. Si no existe, no pinta nada.
+
 ## Comandos
 
 ```
@@ -174,6 +189,7 @@ npm test           Pruebas (Vitest)
 npm run analizar -- ruta/al/workflow.json    Reporte en texto
 node scripts/blindar.mjs ruta/al/workflow.json --salida blindado.json    Blindaje desde la terminal
 node scripts/crear-ejemplos.mjs              Regenera los ejemplos
+npm run estudio                              Regenera public/estudio.json (usa la red, con caché)
 ```
 
 Requiere Node 23.6 o superior: los scripts importan el motor en TypeScript directamente.

@@ -141,3 +141,35 @@ Fecha: 13 de noviembre de 2026.
 
 - No toca MEN-3, POD-4, TUN-2, TUN-3, TUN-4, TUN-5, CIM-3, LLA-1 ni TES-1: quedan como pendientes con su guía.
 - No verifiqué la importación del JSON blindado en una instancia real de n8n. Las pruebas cubren la estructura; la importación queda para Diego, como indica el prompt.
+
+## Fase 5: estudio de plantillas públicas
+
+Fecha: 13 de noviembre de 2026.
+
+### Qué se hizo
+
+- Se inspeccionaron las respuestas reales de la API antes de escribir el script: el listado acepta `sort=views:desc` y hasta 100 filas por página con resultados estables; el detalle trae el workflow importable en `workflow.workflow`.
+- `scripts/estudio-plantillas.mjs`: muestra configurable, caché en disco, menos de 2 peticiones por segundo, reintentos y modo `--sin-red`.
+- Se corrió el estudio completo: 300 más vistas y 200 al azar, de un catálogo de 14219. Se analizaron 500; ninguna falló.
+- Sección "Lo que encontramos en N plantillas públicas" en la pantalla inicial, con la metodología desplegable.
+
+### Resultados (2026-11-13)
+
+| | Plantillas | Puntaje mediano | Con hallazgo alto o crítico | Con ruta de ataque |
+|---|---|---|---|---|
+| Todas | 500 | 84 | 40.4 % | 7 % |
+| Con agente de IA | 206 | 72 | 55.3 % | 15 % |
+| Sin agente de IA | 294 | 88 | 29.9 % | 1.4 % |
+
+Otras cifras: MEN-1 en el 40.8 % de las plantillas con agente; POD-2 en el 21.8 %; webhook sin autenticación en el 15 % de todas; llamadas sin reintentos en el 95.4 %. Ninguna plantilla produjo LLA-1 (secreto real), que era lo esperable y sirve como control de falsas alarmas.
+
+### Qué falló y cómo se corrigió
+
+1. **`sort=totalViews:desc` devuelve error 400.** El nombre del campo en el listado es `totalViews`, pero el parámetro de orden es `views:desc`. Se probó antes de escribir el script.
+2. **Pedir 250 filas devuelve 246.** Con páginas grandes el listado omite filas. El script usa páginas de 100.
+
+### Límites que conviene decir al presentar las cifras
+
+- Es análisis estático sobre plantillas, que son puntos de partida y no workflows en producción.
+- VIG-1 aparece en casi todas porque una plantilla no puede traer un workflow de errores: no es un defecto de quien la publicó.
+- La muestra son 500 de 14219 plantillas.

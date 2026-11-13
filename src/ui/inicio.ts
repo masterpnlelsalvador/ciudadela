@@ -1,6 +1,7 @@
 // Pantalla inicial: pegar o arrastrar el JSON, o abrir un ejemplo.
 import { h, icono } from './dom.ts';
 import { ICONO } from './iconos.ts';
+import { crearEstudio } from './estudio.ts';
 
 export interface Ejemplo {
   archivo: string;
@@ -134,6 +135,12 @@ export function crearInicio(acciones: AccionesInicio): PantallaInicio {
     ),
   );
 
+  // El estudio de plantillas aparece solo si public/estudio.json existe.
+  const huecoEstudio = h('div', { class: 'inicio-estudio' });
+  void crearEstudio().then((seccion) => {
+    if (seccion) huecoEstudio.append(seccion);
+  });
+
   const el = h(
     'main',
     { class: 'inicio' },
@@ -147,6 +154,7 @@ export function crearInicio(acciones: AccionesInicio): PantallaInicio {
       zona,
       h('p', { class: 'inicio-privacidad' }, icono(ICONO.candado), h('span', null, h('strong', null, 'Tu workflow no sale de tu navegador.'), ' Sin servidor, sin analítica y sin IA: el análisis lo hacen reglas fijas en tu computadora.')),
       ejemplos,
+      huecoEstudio,
       h('p', { class: 'inicio-firma' }, 'Hecho por Alkyora'),
     ),
   );

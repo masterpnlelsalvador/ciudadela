@@ -122,3 +122,20 @@ Si el workflow envía datos personales a un proveedor de IA, el blindaje no lo c
 
 **D38. La fecha del reporte la pone la interfaz.**
 `reporteMarkdown` recibe la fecha como parámetro para que el motor siga sin leer el reloj.
+
+## Fase 5: estudio de plantillas
+
+**D39. Muestra al azar por páginas, con semilla.**
+La API no ofrece un orden aleatorio. El script elige páginas al azar del listado completo (ordenado por vistas) y toma hasta 8 plantillas de cada una, con un generador determinista. Con la misma semilla y el mismo catálogo, la muestra se repite. Las plantillas de pago se descartan porque su JSON no es público.
+
+**D40. Los marcadores no inflan las cifras.**
+Una plantilla no puede traer secretos reales ni un workflow de errores (es propio de cada instancia). Por eso LLA-2 se publica separado en "marcador" y "literal", PUE-1 en "webhook" y "formulario", y además del puntaje mediano se publica el mediano sin VIG-1. La web usa el puntaje tal cual y lo explica en la metodología.
+
+**D41. "Con agente de IA" significa que la plantilla tiene un nodo Agent.**
+No basta con que use un modelo: lo que cambia el riesgo es que el modelo decida qué herramientas usar.
+
+**D42. La sección de la web muestra cuatro cifras, no una tabla.**
+Hallazgos altos o críticos, agentes sin revisión de entrada, llamadas sin reintentos y el puntaje mediano con y sin agente. El resto de los datos queda en `estudio.json` para quien quiera verlos.
+
+**D43. `estudio.json` se versiona.**
+Es un resultado, no un artefacto de build: desplegar no debe depender de que la API de n8n responda. La caché de plantillas (`.cache/`) no se versiona.
