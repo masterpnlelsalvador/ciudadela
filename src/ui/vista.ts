@@ -3,6 +3,7 @@ import type { Analisis, AreaId, Cambio, Hallazgo, NodoAnalizado, PasoRuta, Punta
 import { COMO_SE_CALCULA, ETIQUETA_SEVERIDAD, PESO_SEVERIDAD, PIE_DEL_REPORTE, blindar, limpiarParaCompartir, puntoDeRebote, reporteMarkdown } from '../engine/index.ts';
 import { Ciudadela, ID_BOVEDA, ID_FARO } from '../escena/ciudadela.ts';
 import { Simulacion } from '../escena/simulacion.ts';
+import { SimulacionPlana, VistaPlano } from '../escena/vistaPlano.ts';
 import { COLOR_SEVERIDAD, NOMBRE_ROL } from '../escena/paleta.ts';
 import { h, icono, poner, textoRico, vaciar } from './dom.ts';
 import { ICONO, ICONO_DEFENSA } from './iconos.ts';
@@ -142,8 +143,9 @@ export function crearVista(datos: DatosVista, acciones: { alVolver(): void }): V
   let viendoBlindado = false;
   let nodoPorNombre = new Map<string, NodoAnalizado>();
   let hallazgoPorId = new Map<string, Hallazgo>();
-  let ciudadela: Ciudadela | null = null;
-  let simulacion: Simulacion | null = null;
+  // La escena puede ser la ciudadela 3D o la vista plano; las dos ofrecen lo mismo.
+  let ciudadela: Ciudadela | VistaPlano | null = null;
+  let simulacion: Simulacion | SimulacionPlana | null = null;
   let pestana: 'seguridad' | 'logica' | 'fortalezas' = 'seguridad';
   let filtro: AreaId | null = null;
 
@@ -810,57 +812,92 @@ export function crearVista(datos: DatosVista, acciones: { alVolver(): void }): V
   pintarPanel();
   pintarActos(1);
 
-  // --- Escena 3D ------------------------------------------------------------
-  const iniciar = () => {
-    if (!Ciudadela.soportado()) {
-      lienzo.append(h('p', { class: 'sin-3d' }, 'Tu navegador no puede mostrar la ciudadela en 3D (WebGL no está disponible). El reporte completo está en el panel.'));
-      pista.hidden = true;
-      leyenda.hidden = true;
-      botonEncuadre.hidden = true;
-      return;
-    }
-    ciudadela = new Ciudadela(lienzo, {
-      alPasar: (info) => {
-        if (!info) {
-          globo.hidden = true;
-          return;
-        }
-        vaciar(globo);
-        if (info.nombre === ID_BOVEDA || info.nombre === ID_FARO) {
-          poner(globo, h('strong', { text: info.nombre === ID_BOVEDA ? 'Bóveda de credenciales' : 'Faro del vigía' }), h('span', null, info.nombre === ID_BOVEDA ? 'Defensa Llaves' : 'Defensa Vigías'));
-        } else {
-          const n = nodoPorNombre.get(info.nombre);
-          if (!n) return;
-          poner(
-            globo,
-            h('strong', { text: n.nombre }),
-            h('span', { text: NOMBRE_ROL[n.rol] }),
-            n.peor && n.peor !== 'info' ? h('span', { class: `globo-sev sev-${n.peor}` }, `${n.hallazgos.length} ${n.hallazgos.length === 1 ? 'hallazgo' : 'hallazgos'} · ${ETIQUETA_SEVERIDAD[n.peor].toLowerCase()}`) : null,
-          );
-        }
-        const caja = escenario.getBoundingClientRect();
-        globo.hidden = false;
-        const x = Math.min(info.x - caja.left + 14, caja.width - globo.offsetWidth - 8);
-        const y = Math.max(8, info.y - caja.top - globo.offsetHeight - 10);
-        globo.style.transform = `translate(${Math.round(x)}px, ${Math.round(y)}px)`;
-      },
-      alElegir: (nombre, fraccionX) => {
-        if (simulacion?.activa) return;
-        ciudadela?.limpiarEnfoque();
-        // El panel se abre del lado contrario al edificio para no taparlo.
-        detalle.classList.toggle('detalle-izquierda', fraccionX > 0.58);
-        mostrarDetalle(nombre);
-      },
-    });
-    ciudadela.cargar(a);
-    simulacion = new Simulacion(ciudadela);
+  // --- Escena: ciudadela 3D o vista plano -----------------------------------
+  const opcionesDeEscena = {
+    alPasar: (info: { nombre: string; x: number; y: number } | null) => {
+      if (!info) {
+        globo.hidden = true;
+        return;
+      }
+      vaciar(globo);
+      if (info.nombre === ID_BOVEDA || info.nombre === ID_FARO) {
+        poner(globo, h('strong', { text: info.nombre === ID_BOVEDA ? 'Bóveda de credenciales' : 'Faro del vigía' }), h('span', null, info.nombre === ID_BOVEDA ? 'Defensa Llaves' : 'Defensa Vigías'));
+      } else {
+        const n = nodoPorNombre.get(info.nombre);
+        if (!n) return;
+        poner(
+          globo,
+          h('strong', { text: n.nombre }),
+          h('span', { text: NOMBRE_ROL[n.rol] }),
+          n.peor && n.peor !== 'info' ? h('span', { class: `globo-sev sev-${n.peor}` }, `${n.hallazgos.length} ${n.hallazgos.length === 1 ? 'hallazgo' : 'hallazgos'} · ${ETIQUETA_SEVERIDAD[n.peor].toLowerCase()}`) : null,
+        );
+      }
+      const caja = escenario.getBoundingClientRect();
+      globo.hidden = false;
+      const x = Math.max(8, Math.min(info.x - caja.left + 14, caja.width - globo.offsetWidth - 8));
+      const y = Math.max(8, info.y - caja.top - globo.offsetHeight - 10);
+      globo.style.transform = `translate(${Math.round(x)}px, ${Math.round(y)}px)`;
+    },
+    alElegir: (nombre: string | null, fraccionX: number) => {
+      if (simulacion?.activa) return;
+      ciudadela?.limpiarEnfoque();
+      // El panel se abre del lado contrario al edificio para no taparlo.
+      detalle.classList.toggle('detalle-izquierda', fraccionX > 0.58);
+      mostrarDetalle(nombre);
+    },
   };
-  // Espera a que el contenedor tenga tamaño antes de crear el lienzo.
-  requestAnimationFrame(iniciar);
+
+  const hay3D = Ciudadela.soportado();
+  let modo: '3d' | 'plano' = hay3D && window.innerWidth >= 760 ? '3d' : 'plano';
+  const botonModo = h('button', { class: 'boton escenario-modo', type: 'button', hidden: !hay3D });
+
+  const montarEscena = () => {
+    simulacion?.detener();
+    ciudadela?.destruir();
+    narrador.hidden = true;
+    cerrarDetalle();
+    globo.hidden = true;
+    escenario.classList.toggle('escenario-plano', modo === 'plano');
+    if (modo === '3d') {
+      const escena = new Ciudadela(lienzo, opcionesDeEscena);
+      escena.cargar(a);
+      ciudadela = escena;
+      simulacion = new Simulacion(escena);
+      pista.textContent = 'Arrastra para girar · rueda para acercar · clic en un edificio para ver sus hallazgos';
+      botonModo.textContent = 'Vista plano';
+      botonModo.title = 'Ver la ciudadela como un plano 2D';
+    } else {
+      const escena = new VistaPlano(lienzo, opcionesDeEscena);
+      escena.cargar(a);
+      ciudadela = escena;
+      simulacion = new SimulacionPlana(escena);
+      pista.textContent = 'Arrastra para mover · rueda o pellizco para acercar · toca un edificio para ver sus hallazgos';
+      botonModo.textContent = 'Vista 3D';
+      botonModo.title = 'Ver la ciudadela en 3D';
+    }
+    pista.hidden = false;
+    pintarActos(actoActual());
+  };
+  botonModo.addEventListener('click', () => {
+    modo = modo === '3d' ? 'plano' : '3d';
+    montarEscena();
+  });
+  escenario.append(botonModo);
+  if (!hay3D) escenario.append(h('p', { class: 'escenario-aviso' }, 'Tu navegador no tiene WebGL: se muestra la vista plano, con la misma información.'));
+
+  // La escena se monta en cuanto la vista está en la página (el contenedor ya tiene
+  // tamaño). Se usa una microtarea y no requestAnimationFrame: en una pestaña en
+  // segundo plano los cuadros no llegan, y un montaje tardío pisaría lo que la
+  // persona ya hizo.
+  let destruida = false;
+  queueMicrotask(() => {
+    if (!destruida && !ciudadela) montarEscena();
+  });
 
   return {
     el,
     destruir: () => {
+      destruida = true;
       simulacion?.detener();
       ciudadela?.destruir();
       ciudadela = null;

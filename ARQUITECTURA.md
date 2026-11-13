@@ -2,7 +2,7 @@
 
 Ciudadela audita la seguridad de workflows de n8n con análisis estático. Todo corre en el navegador: no hay backend, ni analítica, ni peticiones de red en tiempo de ejecución.
 
-Estado: fases 1 a 5 terminadas (motor, ciudadela 3D, simulación, blindaje y estudio de plantillas). Ver `BITACORA.md`.
+Estado: las seis fases están terminadas. Ver `BITACORA.md`.
 
 ## Mapa del repositorio
 
@@ -36,10 +36,13 @@ src/escena/
   ciudadela.ts        Clase Ciudadela (three.js): edificios, símbolos, cámara e interacción.
   paleta.ts           Colores y nombres de los roles.
   simulacion.ts       Clase Simulacion: el intruso que recorre una ruta, o que rebota.
+  vistaPlano.ts       Vista plano 2D en SVG (VistaPlano) y su simulación (SimulacionPlana).
 scripts/
   analizar.mjs        Reporte en texto desde la terminal.
   blindar.mjs         Blinda un workflow desde la terminal y escribe el JSON corregido.
   estudio-plantillas.mjs  Estudio de plantillas públicas → public/estudio.json.
+  crear-workflow-grande.mjs  Workflow sintético de N nodos para probar el rendimiento.
+netlify.toml          Build, carpeta de publicación y cabeceras de seguridad (CSP).
   crear-ejemplos.mjs  Genera los tres ejemplos de public/ejemplos/.
 public/ejemplos/      Ejemplos sintéticos + ESPERADO.md + indice.json.
 tests/                Vitest: unitarias por regla, ejemplos y pruebas de oro.
@@ -179,6 +182,25 @@ Pasos: (1) toma las N plantillas gratuitas más vistas; (2) elige páginas al az
 `public/estudio.json` contiene: fecha, método, total y cinco resúmenes (`todas`, `masVistas`, `alAzar`, `conAgenteDeIA`, `sinAgenteDeIA`), cada uno con medianas, porcentaje con hallazgos altos o críticos, porcentaje con ruta de ataque y porcentaje de plantillas con cada regla y cada fortaleza. No hay nombres, autores ni ids.
 
 `src/ui/estudio.ts` pide `./estudio.json` y, si existe, pinta cuatro cifras y la metodología en la pantalla inicial. Si no existe, no pinta nada.
+
+## Vista plano
+
+`src/escena/vistaPlano.ts` dibuja la misma ciudadela en 2D con SVG, a partir del mismo `calcularPlano`. Se usa cuando no hay WebGL o la ventana mide menos de 760 px de ancho; en escritorio hay un botón para alternar entre "Vista plano" y "Vista 3D".
+
+`VistaPlano` y `Ciudadela` ofrecen los mismos métodos (`cargar`, `transformar`, `enfocar`, `limpiarEnfoque`, `elegir`, `encuadrar`, `destruir`), y `SimulacionPlana` y `Simulacion` también (`iniciar`, `saltar`, `detener`, `activa`). Por eso `vista.ts` no distingue entre una y otra: guarda la escena en `ciudadela` y el simulador en `simulacion`, y `montarEscena()` crea la pareja que toca.
+
+La vista plano admite arrastre, rueda y pellizco con dos dedos, y los nodos son botones enfocables con teclado.
+
+## Rendimiento
+
+- Casas, tejados, ventanas, tramos de muralla, almenas, caminos y partículas son `InstancedMesh`.
+- Como máximo 8 luces puntuales encendidas por escena (las más intensas).
+- `Ciudadela.medirFluidez` mide los primeros 80 cuadros; si el promedio pasa de 45 ms, apaga las sombras y baja la resolución a la nativa. Lo hace una sola vez.
+- El motor analiza un workflow de 150 nodos en unos 135 ms y lo blinda en unos 120 ms (Node 24, laptop).
+
+## Despliegue
+
+`npm run build` genera `dist/` con `index.html`, `assets/`, `ejemplos/` y `estudio.json`. `netlify.toml` fija Node 24 y aplica una política de contenido con `connect-src 'self'`: la página no puede contactar otro origen. `test-fixtures/` y `.cache/` no están en `public/`, así que no se despliegan.
 
 ## Comandos
 

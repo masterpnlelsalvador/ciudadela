@@ -1928,3 +1928,17 @@ button.acto:disabled {
     min-height: 0;
   }
 }
+
+/* En pantallas angostas el narrador se ancla abajo, sobre el reporte, para no tapar el plano. */
+@media (max-width: 980px) {
+  .narrador {
+    position: fixed;
+    left: 8px;
+    right: 8px;
+    bottom: 8px;
+    width: auto;
+    transform: none;
+    max-height: 62vh;
+    overflow-y: auto;
+  }
+}

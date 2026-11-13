@@ -125,6 +125,10 @@ export class Ciudadela {
   private distanciaSeguimiento = 26;
   private tenidos = new Map<string, () => void>();
   private grupoMuralla: THREE.Group | null = null;
+  private cuadroPrevio = 0;
+  private sumaDeCuadros = 0;
+  private cuadrosMedidos = 0;
+  private calidadBaja = false;
   /** Animaciones cortas en curso (transformación al blindar). */
   private transiciones: Array<{ t0: number; dur: number; avanzar: (k: number) => void; alFinal?: () => void }> = [];
   private indiceCasa = new Map<string, number>();
@@ -301,6 +305,14 @@ export class Ciudadela {
     this.construirCaminos(a, ciudad);
     this.construirSimbolos(a, ciudad, peorDe);
     this.construirBovedaYFaro(a, plano, ciudad);
+
+    // En workflows grandes se limita el número de luces puntuales: cada una encarece
+    // el sombreado de toda la escena. Se conservan las más intensas.
+    const luces: THREE.PointLight[] = [];
+    ciudad.traverse((o) => {
+      if ((o as THREE.PointLight).isPointLight) luces.push(o as THREE.PointLight);
+    });
+    luces.sort((x, y) => y.intensity - x.intensity).forEach((luz, i) => (luz.visible = i < 8));
 
     // Zonas de selección (no se dibujan)
     for (const e of this.edificios.values()) {
@@ -958,6 +970,7 @@ export class Ciudadela {
     if (!this.activo) return;
     const ahora = performance.now();
     const segundos = ahora / 1000;
+    this.medirFluidez(ahora);
 
     if (this.construyendo) this.aplicarConstruccion((ahora - this.inicioConstruccion) / 1000);
 
@@ -1010,6 +1023,29 @@ export class Ciudadela {
     this.renderer.render(this.escena, this.camara);
     this.colocarEtiquetas();
   };
+
+  /**
+   * Si el equipo no llega a unos 22 cuadros por segundo, baja la calidad una sola vez:
+   * sin sombras y con la resolución nativa en lugar de la de alta densidad.
+   * Los saltos largos (pestaña en segundo plano) no cuentan.
+   */
+  private medirFluidez(ahora: number): void {
+    const dt = ahora - this.cuadroPrevio;
+    this.cuadroPrevio = ahora;
+    if (this.calidadBaja || this.construyendo || dt < 4 || dt > 250) return;
+    this.sumaDeCuadros += dt;
+    this.cuadrosMedidos++;
+    if (this.cuadrosMedidos < 80) return;
+    const promedio = this.sumaDeCuadros / this.cuadrosMedidos;
+    this.sumaDeCuadros = 0;
+    this.cuadrosMedidos = 0;
+    if (promedio > 45) {
+      this.calidadBaja = true;
+      this.luna.castShadow = false;
+      this.renderer.setPixelRatio(1);
+      this.ajustar();
+    }
+  }
 
   private colocarEtiquetas(): void {
     const ancho = this.contenedor.clientWidth;

@@ -173,3 +173,39 @@ Otras cifras: MEN-1 en el 40.8 % de las plantillas con agente; POD-2 en el 21.8 
 - Es análisis estático sobre plantillas, que son puntos de partida y no workflows en producción.
 - VIG-1 aparece en casi todas porque una plantilla no puede traer un workflow de errores: no es un defecto de quien la publicó.
 - La muestra son 500 de 14219 plantillas.
+
+## Fase 6: pulido
+
+Fecha: 13 de noviembre de 2026.
+
+### Qué se hizo
+
+- Vista plano 2D (SVG) con la misma información y los tres actos. Se abre sola sin WebGL o en pantallas angostas; en escritorio se alterna con un botón.
+- Móvil: sin desborde horizontal a 375 px, narrador anclado abajo, botones que ocupan el ancho, diálogo "Ver cambios" a pantalla casi completa.
+- Rendimiento: tope de luces, calidad adaptable y un generador de workflows grandes para probar (`scripts/crear-workflow-grande.mjs`).
+- `netlify.toml` con build, Node 24, cabeceras de seguridad y caché de `assets/`.
+- `README.md` con qué hace, privacidad, uso local, comandos y tres formas de desplegar en Netlify.
+- Pantalla inicial: se agregó la sección del estudio de plantillas.
+
+### Qué falló y cómo se corrigió
+
+1. **La escena se montaba tarde y borraba lo que la persona había hecho.** El montaje inicial esperaba un cuadro de animación. En una pestaña en segundo plano ese cuadro llegó segundos después, cuando ya había una simulación en marcha, y la reinició. Corrección: se monta con una microtarea y solo si todavía no hay escena.
+2. **El plano hacía un zoom exagerado al enfocar un solo nodo.** Ahora nunca se acerca más de la mitad del plano.
+3. **En móvil el narrador tapaba el plano.** Se ancló al borde inferior de la pantalla.
+
+### Verificación final
+
+- `npm test`: 166 pruebas pasan, 8 omitidas (los tres fixtures que `EXPECTED.md` describe y no están en la carpeta).
+- `npm run build`: genera `dist/` (899 kB de JS, 247 kB comprimido). `dist/` no contiene nada de `test-fixtures/`.
+- En el navegador, los tres ejemplos recorren los tres actos sin errores en consola, en 3D y en vista plano:
+  - Clínica dental: 0 → 92; el ataque llega hasta `enviar_recordatorio` y, tras blindar, rebota en `webhook_chatwoot`.
+  - Formulario de leads: 84 → 98 (lógica 82 → 94); tras blindar, rebota en `Webhook`.
+  - Bien blindado: 100, sin ruta, "no hay nada que corregir".
+- Un workflow sintético de 150 nodos se analiza y se construye sin errores.
+
+### Lo que no se pudo verificar aquí
+
+- **Fluidez con 150 nodos.** El panel de navegador de esta sesión dibuja alrededor de un cuadro por segundo incluso con el ejemplo más pequeño (está en segundo plano), así que no sirve para medir. Queda por comprobar en una laptop real con la ventana al frente. El equipo tiene una Intel HD 5500; si va lenta, la calidad adaptable debería activarse sola.
+- **Importación en n8n.** El JSON blindado del ejemplo 1 está en `docs/verificacion/clinica-dental-whatsapp-blindado.json` para importarlo. Las pruebas cubren su estructura, no la importación.
+- **Cabeceras de Netlify.** La política de contenido solo se aplica en Netlify; en local no se pudo probar.
+- **Los tres fixtures que faltan** en `test-fixtures/privados/`.

@@ -139,3 +139,23 @@ Hallazgos altos o críticos, agentes sin revisión de entrada, llamadas sin rein
 
 **D43. `estudio.json` se versiona.**
 Es un resultado, no un artefacto de build: desplegar no debe depender de que la API de n8n responda. La caché de plantillas (`.cache/`) no se versiona.
+
+## Fase 6: pulido
+
+**D44. La vista plano es otra escena con la misma interfaz, no un modo de la escena 3D.**
+Así no carga three.js en la lógica de dibujo 2D, funciona sin WebGL y `vista.ts` no tiene ramas por modo. En pantallas de menos de 760 px se abre directamente en plano; quien tenga WebGL puede cambiar a 3D con un botón.
+
+**D45. La vista plano también simula y también blinda.**
+"Con la misma información" incluye los tres actos: un punto rojo recorre la ruta, los nodos comprometidos se tiñen y, tras blindar, el punto se frena en el primer paso corregido.
+
+**D46. La escena se monta con una microtarea, no con requestAnimationFrame.**
+En una pestaña en segundo plano los cuadros de animación no llegan. El montaje tardío llegaba después de que la persona ya había hecho algo y lo borraba.
+
+**D47. Política de contenido en Netlify.**
+`connect-src 'self'` convierte la promesa "tu workflow no sale de tu navegador" en una restricción técnica. Se mantiene `style-src 'unsafe-inline'` porque la interfaz posiciona elementos con estilos en línea; no hay scripts en línea.
+
+**D48. Calidad adaptable en lugar de un interruptor.**
+Si el equipo va lento, la escena apaga las sombras y baja la resolución sola. No hay un control de "calidad" que la persona tenga que entender.
+
+**D49. En móvil el narrador se ancla al borde inferior de la pantalla.**
+Dentro del escenario tapaba el plano, que en móvil ocupa poco más de media pantalla.
