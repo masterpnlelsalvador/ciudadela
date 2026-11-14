@@ -10,6 +10,7 @@ import {
   entradaSinAutenticacion,
   esCodigo,
   esCondicional,
+  devuelveLoQueEscribe,
   esDePaso,
   esExtractor,
   esGuardrails,
@@ -437,6 +438,20 @@ export function analizarContaminacion(wf: WorkflowN8n, grafo: Grafo): Taint {
     }
 
     if (esDePaso(n) || !esLlamadaExterna(n)) return ent;
+
+    if (devuelveLoQueEscribe(n)) {
+      // La salida es la fila escrita: conserva las marcas de los valores que se guardaron.
+      const columnas = n.parameters?.columns as { mappingMode?: unknown; value?: unknown } | undefined;
+      if (columnas?.mappingMode === 'autoMapInputData') return ent;
+      const s = vacia();
+      for (const c of clavesDeNodo(n.name)) s.base.add(c);
+      if (columnas?.value && typeof columnas.value === 'object') {
+        for (const [columna, valor] of Object.entries(columnas.value as Record<string, unknown>)) {
+          s.campos.set(columna, clavesDeValor(n.name, valor));
+        }
+      }
+      return s;
+    }
 
     // Nodos de aplicaciones: su salida es la respuesta del servicio, no lo que recibieron.
     return vacia();

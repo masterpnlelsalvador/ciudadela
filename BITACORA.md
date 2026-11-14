@@ -225,3 +225,36 @@ El sitio se desplegó en Netlify desde el repositorio de GitHub. Revisión sobre
 
 1. **Un error de política de contenido en la consola que no es de Ciudadela.** Netlify inyecta en los sitios del plan gratuito un script para mostrar su insignia. El script se sirve desde el mismo dominio y no hace peticiones de red; la política bloquea su parte en línea, así que la insignia no se dibuja. Se deja bloqueado: abrir `script-src` para una insignia debilitaría la política.
 2. **Advertencia de three.js por el tipo de sombra.** `PCFSoftShadowMap` ya no existe en la versión empaquetada y three.js usaba `PCFShadowMap` en su lugar. Corrección: se pide `PCFShadowMap` directamente. No cambia lo que se ve.
+
+## Pruebas de oro completas
+
+Fecha: 14 de noviembre de 2026.
+
+Se agregaron a `test-fixtures/privados/` los tres workflows que `EXPECTED.md` describía y faltaban. Con ellos ya no queda ninguna prueba omitida: **178 pruebas pasan, 0 omitidas**.
+
+### Qué falló y cómo se corrigió
+
+1. **El motor no reportaba TUN-5 en el formulario de contacto original.** `EXPECTED.md` pide TUN-5 como info en el nodo de correo, porque el mensaje incluye datos del formulario y no define el tipo de correo. El motor no lo veía: el correo va después de "Append row in sheet" y el rastreo daba por limpia la salida de cualquier nodo de aplicación. En n8n, Google Sheets devuelve la fila que escribió, así que el correo sí recibe lo que envió la persona. Corrección: la salida de una escritura en Google Sheets, Airtable o una tabla de datos conserva las marcas de lo que se guardó (D50). Se agregó una prueba propia, que no depende de los workflows privados.
+
+### Efecto en el resto
+
+- Los puntajes de los tres ejemplos y de los workflows reales ya analizados no cambiaron.
+- En el estudio de plantillas cambiaron 6 de 500, todas con hallazgos nuevos del mismo tipo (datos guardados en una tabla y usados después). `public/estudio.json` se regeneró con la misma muestra del 13 de noviembre:
+
+| Cifra | Antes | Ahora |
+|---|---|---|
+| Con algún hallazgo alto o crítico | 40.4 % | 40.6 % |
+| MEN-1 entre las que tienen agente | 40.8 % | 41.3 % |
+| TUN-5 en todas | 4.2 % | 4.6 % |
+
+  Las medianas (84, 72 con agente y 88 sin agente) no cambiaron. Las cifras de la sección "Fase 5" de esta bitácora son las de ese día.
+
+### Verificado por Diego
+
+- **Importación en n8n.** Importó en n8n `docs/verificacion/clinica-dental-whatsapp-blindado.json`, el JSON blindado del ejemplo 1.
+- Probó la herramienta con workflows propios en el sitio publicado.
+
+### Lo que sigue sin verificar
+
+- La lectura del reporte en un teléfono real (solo se probó con emulación a 375 px).
+- La fluidez de la vista 3D con unos 150 nodos en una laptop.

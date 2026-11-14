@@ -253,4 +253,23 @@ describe('Túneles', () => {
     expect(reglas(a)).not.toContain('TUN-5');
     expect(a.fortalezas.map((f) => f.codigo)).toContain('F-ESCAPE');
   });
+
+  it('TUN-5: los datos siguen marcados después de guardarlos en una hoja de cálculo', () => {
+    // Sheets devuelve la fila que escribió: el correo que viene después lee datos del formulario.
+    const hoja = (columnas: Record<string, unknown>) => nodo('hoja', 'googleSheets', { operation: 'append', columns: columnas });
+    const caso = (columnas: Record<string, unknown>) =>
+      analizarFlujo(
+        flujo([webhook('W', { authentication: 'headerAuth' }), hoja(columnas), correo({ message: '=Nombre: {{ $json.nombre }}' })], [
+          ['W', 'hoja'],
+          ['hoja', 'correo'],
+        ]),
+      );
+    const definidas = caso({ mappingMode: 'defineBelow', value: { nombre: '={{ $json.body.name }}', origen: 'web' } });
+    expect(hallazgo(definidas, 'TUN-5')?.severidad).toBe('info');
+    expect(hallazgo(definidas, 'TUN-5')?.nodos).toEqual(['correo']);
+    expect(hallazgo(caso({ mappingMode: 'autoMapInputData' }), 'TUN-5')?.severidad).toBe('info');
+    // Una columna con un valor fijo no arrastra la marca.
+    const fija = caso({ mappingMode: 'defineBelow', value: { nombre: 'fijo', otro: '={{ $json.body.name }}' } });
+    expect(reglas(fija)).not.toContain('TUN-5');
+  });
 });

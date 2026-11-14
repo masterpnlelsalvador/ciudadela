@@ -201,8 +201,17 @@ function resumen(grupo) {
 }
 
 const version = JSON.parse(fs.readFileSync(path.join(raiz, 'package.json'), 'utf8')).version;
+// Sin red se vuelve a analizar la misma muestra: la fecha del estudio sigue siendo la del día en que se descargó.
+let fechaDeLaMuestra = new Date().toISOString().slice(0, 10);
+if (SIN_RED && fs.existsSync(SALIDA)) {
+  try {
+    fechaDeLaMuestra = JSON.parse(fs.readFileSync(SALIDA, 'utf8')).generado || fechaDeLaMuestra;
+  } catch {
+    // Si el archivo anterior no se puede leer, queda la fecha de hoy.
+  }
+}
 const estudio = {
-  generado: new Date().toISOString().slice(0, 10),
+  generado: fechaDeLaMuestra,
   motor: `ciudadela ${version}`,
   fuente: 'API pública de plantillas de n8n (api.n8n.io/templates)',
   metodo: {

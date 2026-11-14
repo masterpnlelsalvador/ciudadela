@@ -426,6 +426,17 @@ export function traeContenidoDeTerceros(n: NodoN8n): boolean {
   return false;
 }
 
+const TABLAS_QUE_DEVUELVEN_LA_FILA = new Set(['googleSheets', 'airtable', 'dataTable']);
+
+/**
+ * Nodo de tabla que, al escribir una fila, devuelve esa misma fila como salida.
+ * Lo que llega al nodo siguiente es lo que se escribió, no un acuse vacío.
+ */
+export function devuelveLoQueEscribe(n: NodoN8n): boolean {
+  if (!TABLAS_QUE_DEVUELVEN_LA_FILA.has(tipoCorto(n.type))) return false;
+  return /^(append|appendOrUpdate|update|create|upsert|insert)$/i.test(operacion(n));
+}
+
 /** Llamada a un servicio externo desde el flujo principal (candidata a reintentos). */
 export function esLlamadaExterna(n: NodoN8n): boolean {
   if (esTrigger(n) || esNota(n)) return false;

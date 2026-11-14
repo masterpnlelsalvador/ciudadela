@@ -159,3 +159,11 @@ Si el equipo va lento, la escena apaga las sombras y baja la resolución sola. N
 
 **D49. En móvil el narrador se ancla al borde inferior de la pantalla.**
 Dentro del escenario tapaba el plano, que en móvil ocupa poco más de media pantalla.
+
+## Pruebas de oro completas
+
+**D50. Guardar una fila en una tabla no limpia los datos.**
+Google Sheets, Airtable y las tablas de datos de n8n devuelven la fila que acaban de escribir. Antes el motor trataba la salida de cualquier nodo de aplicación como un acuse del servicio, sin datos de fuera, y por eso no veía que un correo posterior a "Append row in sheet" seguía usando lo que escribió la persona en el formulario. Ahora la salida de esas escrituras conserva las marcas de los valores guardados, columna por columna cuando las columnas están definidas en el nodo. Una columna con valor fijo no arrastra ninguna marca. Solo aplica a esos tres nodos y a sus operaciones de escritura; el resto de las aplicaciones sigue igual.
+
+**D51. Al volver a analizar la muestra sin red, la fecha del estudio no cambia.**
+`npm run estudio -- --sin-red` analiza las mismas plantillas descargadas. La fecha que se muestra es la del día en que se tomó la muestra, no la del reanálisis.
