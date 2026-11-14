@@ -209,3 +209,19 @@ Fecha: 13 de noviembre de 2026.
 - **Importación en n8n.** El JSON blindado del ejemplo 1 está en `docs/verificacion/clinica-dental-whatsapp-blindado.json` para importarlo. Las pruebas cubren su estructura, no la importación.
 - **Cabeceras de Netlify.** La política de contenido solo se aplica en Netlify; en local no se pudo probar.
 - **Los tres fixtures que faltan** en `test-fixtures/privados/`.
+
+## Despliegue
+
+Fecha: 13 de noviembre de 2026.
+
+El sitio se desplegó en Netlify desde el repositorio de GitHub. Revisión sobre el sitio publicado:
+
+- Las cabeceras de `netlify.toml` se aplican: política de contenido con `connect-src 'self'`, sin marcos y sin formularios, más HSTS y `nosniff`.
+- Los tres ejemplos recorren sus actos con los mismos resultados que en local (0 → 92, 84 → 98 y 100).
+- Todas las peticiones de la sesión fueron al mismo origen: el JS, el CSS, `estudio.json` y los ejemplos.
+- Los documentos del repositorio y `test-fixtures/` no se publican (404).
+
+### Qué apareció y qué se hizo
+
+1. **Un error de política de contenido en la consola que no es de Ciudadela.** Netlify inyecta en los sitios del plan gratuito un script para mostrar su insignia. El script se sirve desde el mismo dominio y no hace peticiones de red; la política bloquea su parte en línea, así que la insignia no se dibuja. Se deja bloqueado: abrir `script-src` para una insignia debilitaría la política.
+2. **Advertencia de three.js por el tipo de sombra.** `PCFSoftShadowMap` ya no existe en la versión empaquetada y three.js usaba `PCFShadowMap` en su lugar. Corrección: se pide `PCFShadowMap` directamente. No cambia lo que se ve.

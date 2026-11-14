@@ -144,7 +144,7 @@ export class Ciudadela {
     this.renderer.toneMapping = THREE.ACESFilmicToneMapping;
     this.renderer.toneMappingExposure = 1.45;
     this.renderer.shadowMap.enabled = true;
-    this.renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+    this.renderer.shadowMap.type = THREE.PCFShadowMap;
     this.renderer.domElement.className = 'lienzo-ciudadela';
     this.renderer.domElement.setAttribute('aria-label', 'Ciudadela 3D del workflow');
     contenedor.appendChild(this.renderer.domElement);
