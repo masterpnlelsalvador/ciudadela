@@ -4,7 +4,8 @@ import * as THREE from 'three';
 import type { Ciudadela } from './ciudadela.ts';
 
 export interface PasoSimulado {
-  nodo: string;
+  /** Nodos del paso. Un tramo de tránsito trae varios: el intruso los recorre sin detenerse. */
+  nodos: string[];
   /** true si el paso lo justifica una regla (se narra con pausa). */
   clave: boolean;
 }
@@ -32,7 +33,7 @@ interface Evento {
 }
 
 const ROJO = 0xff3048;
-const DURACION_MAXIMA = 24;
+const DURACION_MAXIMA = 20;
 
 export class Simulacion {
   private ciudadela: Ciudadela;
@@ -67,7 +68,7 @@ export class Simulacion {
     const c = this.ciudadela;
 
     // Puntos del recorrido
-    const primero = c.lugarDe(opciones.pasos[0].nodo);
+    const primero = c.lugarDe(opciones.pasos[0].nodos[0]);
     const base = primero ?? { ...c.puntoDeMuralla(), alto: 2, radio: 1.5 };
     let normal = primero?.normal ?? (primero ? null : c.puntoDeMuralla().normal);
     if (!normal) {
@@ -75,19 +76,20 @@ export class Simulacion {
       normal = { x: base.x / d, z: base.z / d };
     }
     const afuera = new THREE.Vector3(base.x + normal.x * 9.5, 0, base.z + normal.z * 9.5);
-    const puntos: THREE.Vector3[] = [new THREE.Vector3(base.x + normal.x * 1.1, 0, base.z + normal.z * 1.1)];
-    for (let k = 1; k < opciones.pasos.length; k++) {
-      const lugar = c.lugarDe(opciones.pasos[k].nodo);
-      const anterior = puntos[k - 1];
-      if (!lugar) {
-        puntos.push(anterior.clone());
-        continue;
-      }
-      const destino = new THREE.Vector3(lugar.x, 0, lugar.z);
-      const direccion = destino.clone().sub(anterior);
-      const largo = direccion.length() || 1;
-      puntos.push(destino.sub(direccion.multiplyScalar(Math.min(largo * 0.6, lugar.radio + 0.3) / largo)));
-    }
+    // Un punto por nodo de cada paso; el intruso se detiene justo antes de cada edificio.
+    let anterior = new THREE.Vector3(base.x + normal.x * 1.1, 0, base.z + normal.z * 1.1);
+    const puntos: THREE.Vector3[][] = opciones.pasos.map((paso, k) =>
+      paso.nodos.map((nombre, j) => {
+        if (k === 0 && j === 0) return anterior;
+        const lugar = c.lugarDe(nombre);
+        if (!lugar) return anterior.clone();
+        const destino = new THREE.Vector3(lugar.x, 0, lugar.z);
+        const direccion = destino.clone().sub(anterior);
+        const largo = direccion.length() || 1;
+        anterior = destino.sub(direccion.multiplyScalar(Math.min(largo * 0.6, lugar.radio + 0.3) / largo));
+        return anterior;
+      }),
+    );
 
     // Línea de tiempo
     const rebote = opciones.reboteEn;
@@ -97,32 +99,37 @@ export class Simulacion {
     this.tramos = [];
     this.eventos = [];
     for (let k = 0; k <= ultimo; k++) {
-      let hasta = puntos[k];
-      const esRebote = rebote === k;
-      if (esRebote) {
-        // Se detiene antes de llegar: la defensa lo frena.
-        hasta = k === 0 ? new THREE.Vector3(base.x + normal.x * 3, 0, base.z + normal.z * 3) : desde.clone().lerp(puntos[k], 0.72);
-      }
-      const dur = k === 0 ? 1.7 : Math.min(1.5, Math.max(0.55, desde.distanceTo(hasta) / 7));
-      this.tramos.push({ t0: t, t1: t + dur, desde, hasta });
-      t += dur;
       const indice = k;
-      if (esRebote) {
-        this.eventos.push({ t, hecho: false, accion: () => this.rebotar(indice, hasta, desde) });
+      if (rebote === k) {
+        // Se detiene antes de llegar: la defensa lo frena.
+        const hasta = k === 0 ? new THREE.Vector3(base.x + normal.x * 3, 0, base.z + normal.z * 3) : desde.clone().lerp(puntos[k][0], 0.72);
+        const venia = desde;
+        const dur = k === 0 ? 1.7 : Math.min(1.5, Math.max(0.55, desde.distanceTo(hasta) / 7));
+        this.tramos.push({ t0: t, t1: t + dur, desde, hasta });
+        t += dur;
+        this.eventos.push({ t, hecho: false, accion: () => this.rebotar(indice, hasta, venia) });
         t += 1.5;
-      } else {
-        this.eventos.push({ t, hecho: false, accion: () => this.llegar(indice) });
-        t += opciones.pasos[k].clave ? 2.1 : 0.4;
+        desde = hasta;
+        continue;
       }
-      desde = hasta;
+      // Dentro de un paso el intruso no se detiene: recorre sus nodos de corrido.
+      puntos[k].forEach((hasta, j) => {
+        const distancia = desde.distanceTo(hasta);
+        const dur = k === 0 && j === 0 ? 1.7 : j === 0 ? Math.min(1.5, Math.max(0.55, distancia / 7)) : Math.min(0.9, Math.max(0.3, distancia / 9));
+        this.tramos.push({ t0: t, t1: t + dur, desde, hasta });
+        t += dur;
+        this.eventos.push({ t, hecho: false, accion: () => this.llegar(indice, j) });
+        desde = hasta;
+      });
+      t += opciones.pasos[k].clave ? 2.1 : puntos[k].length > 1 ? 0.9 : 0.4;
     }
     if (rebote === null) {
-      const salida = opciones.pasos[ultimo].nodo;
+      const salida = opciones.pasos[ultimo].nodos[opciones.pasos[ultimo].nodos.length - 1];
       this.eventos.push({ t, hecho: false, accion: () => this.sacarTesoro(salida) });
       t += 2.6;
     }
     this.fin = t;
-    // Nunca más de 24 segundos
+    // Nunca más de 20 segundos
     if (t > DURACION_MAXIMA) {
       const escala = DURACION_MAXIMA / t;
       for (const tramo of this.tramos) {
@@ -271,11 +278,12 @@ export class Simulacion {
     this.colocar(en);
   }
 
-  private llegar(indice: number): void {
+  /** El intruso llega al nodo `j` del paso: el edificio se tiñe y, si es el primero del paso, se narra. */
+  private llegar(indice: number, j: number): void {
     const paso = this.opciones?.pasos[indice];
     if (!paso) return;
-    this.ciudadela.tenir(paso.nodo);
-    this.opciones?.alPaso(indice);
+    this.ciudadela.tenir(paso.nodos[j]);
+    if (j === 0) this.opciones?.alPaso(indice);
   }
 
   private efecto(objeto: THREE.Object3D, dur: number, avanzar: (k: number) => void): void {
@@ -319,7 +327,7 @@ export class Simulacion {
   /** El ataque choca con una defensa: destello, y el intruso sale despedido. */
   private rebotar(indice: number, punto: THREE.Vector3, venia: THREE.Vector3): void {
     const paso = this.opciones?.pasos[indice];
-    const lugar = paso ? this.ciudadela.lugarDe(paso.nodo) : null;
+    const lugar = paso ? this.ciudadela.lugarDe(paso.nodos[0]) : null;
     const centro = lugar ? new THREE.Vector3(lugar.x, 0, lugar.z) : punto.clone();
     const radio = lugar ? lugar.radio : 1.5;
     const alto = lugar ? lugar.alto : 2;

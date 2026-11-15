@@ -1,8 +1,10 @@
 // La vista de la ciudadela y sus tres actos: construir, simular el ataque y blindar.
-import type { Analisis, AreaId, Cambio, Hallazgo, NodoAnalizado, PasoRuta, Puntajes, ResultadoBlindaje, RutaAtaque, Severidad, WorkflowN8n } from '../engine/index.ts';
+import type { Analisis, AreaId, Cambio, Hallazgo, NodoAnalizado, Puntajes, ResultadoBlindaje, RutaAtaque, Severidad, WorkflowN8n } from '../engine/index.ts';
 import { COMO_SE_CALCULA, ETIQUETA_SEVERIDAD, PESO_SEVERIDAD, PIE_DEL_REPORTE, blindar, limpiarParaCompartir, puntoDeRebote, reporteMarkdown } from '../engine/index.ts';
 import type { Margenes } from '../escena/ciudadela.ts';
 import { Ciudadela, ID_BOVEDA, ID_FARO, MARGENES_BASE } from '../escena/ciudadela.ts';
+import type { PasoAgrupado } from '../escena/agrupar.ts';
+import { agruparPasos, indiceAgrupado } from '../escena/agrupar.ts';
 import { Simulacion } from '../escena/simulacion.ts';
 import { SimulacionPlana, VistaPlano } from '../escena/vistaPlano.ts';
 import { COLOR_SEVERIDAD, NOMBRE_ROL } from '../escena/paleta.ts';
@@ -70,19 +72,6 @@ function medidor(valor: number, titulo: string, clase: string, desde?: number): 
   );
 }
 
-/** Junta los pasos de tránsito seguidos para que la ruta se lea de un vistazo. */
-function pasosAgrupados(pasos: PasoRuta[]): Array<PasoRuta | { transito: string[] }> {
-  const salida: Array<PasoRuta | { transito: string[] }> = [];
-  pasos.forEach((p, i) => {
-    const ultimo = salida[salida.length - 1];
-    const esTransito = !p.regla && i > 0 && i < pasos.length - 1;
-    if (esTransito && ultimo && 'transito' in ultimo) ultimo.transito.push(p.nodo);
-    else if (esTransito) salida.push({ transito: [p.nodo] });
-    else salida.push(p);
-  });
-  return salida;
-}
-
 function pildora(s: Severidad): HTMLElement {
   return h('span', { class: `pildora sev-${s}`, text: ETIQUETA_SEVERIDAD[s] });
 }
@@ -131,6 +120,7 @@ interface EstadoNarrador {
   ruta: RutaAtaque | null;
   /** Índice de la ruta en el análisis que se muestra (−1 si es la ruta original repetida). */
   indice: number;
+  /** Índice del paso agrupado (ver agruparPasos). */
   paso: number;
   fin: 'llego' | 'reboto' | null;
   /** true cuando se repite el ataque original sobre la ciudadela blindada. */
@@ -488,11 +478,7 @@ export function crearVista(datos: DatosVista, acciones: { alVolver(): void }): V
       h(
         'ol',
         { class: 'ruta-pasos' },
-        pasosAgrupados(ruta.pasos).map((p) =>
-          'transito' in p
-            ? h('li', { class: 'paso' }, p.transito.length === 1 ? `Pasa por «${p.transito[0]}» sin que nadie lo revise.` : `Pasa por ${p.transito.length} nodos sin que nadie lo revise: ${p.transito.join(', ')}.`)
-            : h('li', { class: p.regla ? 'paso paso-clave' : 'paso' }, p.regla ? h('span', { class: 'codigo', text: p.regla }) : null, h('span', { text: p.texto })),
-        ),
+        agruparPasos(ruta.pasos).map((p) => h('li', { class: p.regla ? 'paso paso-clave' : 'paso' }, p.regla ? h('span', { class: 'codigo', text: p.regla }) : null, h('span', { text: p.texto }))),
       ),
       h(
         'div',
@@ -660,15 +646,16 @@ export function crearVista(datos: DatosVista, acciones: { alVolver(): void }): V
   };
 
   /** Cambio del blindaje que explica por qué un paso de la ruta ya no existe. */
-  const cambioDe = (paso: PasoRuta): Cambio | null => {
+  const cambioDe = (paso: PasoAgrupado): Cambio | null => {
     if (!blindaje || !paso.regla) return null;
     const regla = paso.regla;
-    return blindaje.cambios.find((c) => c.regla.includes(regla) && c.nodos.includes(paso.nodo)) ?? blindaje.cambios.find((c) => c.regla.includes(regla)) ?? null;
+    return blindaje.cambios.find((c) => c.regla.includes(regla) && c.nodos.includes(paso.nodos[0])) ?? blindaje.cambios.find((c) => c.regla.includes(regla)) ?? null;
   };
 
   const pintarNarrador = (e: EstadoNarrador) => {
     vaciar(narrador);
     const r = e.ruta;
+    const pasos = r ? agruparPasos(r.pasos) : [];
     narrador.classList.toggle('narrador-defensa', e.trasBlindar || !r);
     narrador.classList.toggle('narrador-final', !!e.fin);
     narrador.classList.toggle('narrador-en-pausa', !!e.enPausa);
@@ -677,12 +664,12 @@ export function crearVista(datos: DatosVista, acciones: { alVolver(): void }): V
       'div',
       { class: 'narrador-cabecera' },
       h('span', { class: 'narrador-sello' }, e.trasBlindar ? 'El mismo ataque, después de blindar' : r ? (r.tipo === 'tesoro' ? 'Recorrido de los datos' : 'Simulación de ataque') : 'Prueba de resistencia'),
-      r && !e.fin ? h('span', { class: 'narrador-progreso' }, `Paso ${e.paso + 1} de ${r.pasos.length}`) : null,
+      r && !e.fin ? h('span', { class: 'narrador-progreso' }, `Paso ${e.paso + 1} de ${pasos.length}`) : null,
       r
         ? h(
             'div',
             { class: 'narrador-puntos', 'aria-hidden': 'true' },
-            r.pasos.map((p, i) => h('i', { class: `${p.regla ? 'clave' : ''} ${i < e.paso || e.fin === 'llego' ? 'hecho' : i === e.paso ? (e.fin === 'reboto' ? 'frenado' : 'actual') : ''}`.trim() })),
+            pasos.map((p, i) => h('i', { class: `${p.regla ? 'clave' : ''} ${i < e.paso || e.fin === 'llego' ? 'hecho' : i === e.paso ? (e.fin === 'reboto' ? 'frenado' : 'actual') : ''}`.trim() })),
           )
         : null,
       h('button', { class: 'boton boton-icono narrador-cerrar', type: 'button', 'aria-label': 'Cerrar la simulación', onclick: cerrarSimulacion }, icono(ICONO.cerrar)),
@@ -695,16 +682,16 @@ export function crearVista(datos: DatosVista, acciones: { alVolver(): void }): V
           : h('p', { class: 'narrador-texto' }, 'Alguien de fuera se acerca a la muralla y busca una entrada…'),
       );
     } else {
-      const actual = r.pasos[e.paso];
+      const actual = pasos[e.paso];
       if (e.fin === 'reboto' && actual) {
         const cambio = cambioDe(actual);
         cuerpo.push(
-          h('p', { class: 'narrador-texto narrador-bien' }, h('strong', null, `El ataque rebota en «${actual.nodo}». `), cambio ? `${cambio.titulo}.` : 'Ese paso ya no existe en la versión blindada.'),
+          h('p', { class: 'narrador-texto narrador-bien' }, h('strong', null, `El ataque rebota en «${actual.nodos[0]}». `), cambio ? `${cambio.titulo}.` : 'Ese paso ya no existe en la versión blindada.'),
           h('p', { class: 'narrador-sub' }, `Antes llegaba hasta «${r.salida}». `, cambio ? textoRico(cambio.detalle) : null),
         );
       } else if (e.fin === 'llego') {
         cuerpo.push(
-          h('p', { class: 'narrador-texto narrador-mal' }, h('strong', null, e.trasBlindar ? `Esta ruta sigue abierta hasta «${r.salida}». ` : `Llegó hasta «${r.salida}». `), r.pasos[r.pasos.length - 1].texto),
+          h('p', { class: 'narrador-texto narrador-mal' }, h('strong', null, e.trasBlindar ? `Esta ruta sigue abierta hasta «${r.salida}». ` : `Llegó hasta «${r.salida}». `), pasos[pasos.length - 1].texto),
           h('p', { class: 'narrador-sub' }, e.trasBlindar ? 'El blindaje no la cierra: sus correcciones son manuales y están en la lista de pendientes.' : `${r.titulo}. Los edificios en rojo son los que quedaron comprometidos en el camino.`),
         );
       } else if (actual) {
@@ -779,14 +766,18 @@ export function crearVista(datos: DatosVista, acciones: { alVolver(): void }): V
 
   const correr = (r: RutaAtaque, indice: number, reboteEn: number | null, trasBlindar: boolean) => {
     const estado = (paso: number, fin: EstadoNarrador['fin']): EstadoNarrador => ({ ruta: r, indice, paso, fin, trasBlindar });
+    // La simulación recorre los pasos agrupados; el rebote se traduce al paso que lo contiene.
+    const pasos = agruparPasos(r.pasos);
+    const rebote = indiceAgrupado(pasos, reboteEn);
     turno++;
     pintarNarrador(estado(0, null));
     simulacion!.iniciar({
-      pasos: r.pasos.map((p) => ({ nodo: p.nodo, clave: !!p.regla })),
-      reboteEn,
+      pasos: pasos.map((p) => ({ nodos: p.nodos, clave: !!p.regla })),
+      reboteEn: rebote,
       alPaso: (i) => pintarNarrador(estado(i, null)),
-      alRebote: (i) => pintarNarrador(estado(i, 'reboto')),
-      alTerminar: (resultado) => cerrarConPlanoGeneral(estado(resultado === 'reboto' ? (reboteEn ?? 0) : r.pasos.length - 1, resultado)),
+      // Durante el destello los botones todavía no aparecen: llegan tras la pausa del plano final.
+      alRebote: (i) => pintarNarrador({ ...estado(i, 'reboto'), enPausa: !sinMovimiento() }),
+      alTerminar: (resultado) => cerrarConPlanoGeneral(estado(resultado === 'reboto' ? (rebote ?? 0) : pasos.length - 1, resultado)),
     });
   };
 
@@ -804,7 +795,7 @@ export function crearVista(datos: DatosVista, acciones: { alVolver(): void }): V
     turno++;
     pintarNarrador(estado(null));
     simulacion!.iniciar({
-      pasos: [{ nodo: puerta?.nombre ?? '', clave: true }],
+      pasos: [{ nodos: [puerta?.nombre ?? ''], clave: true }],
       reboteEn: 0,
       alPaso: () => undefined,
       alRebote: () => undefined,

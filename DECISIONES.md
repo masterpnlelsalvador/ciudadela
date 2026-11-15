@@ -184,3 +184,9 @@ Con seis rutas, los botones ocupaban dos filas y el panel final tapaba el centro
 
 **D56. Las etiquetas que se enciman se ocultan por prioridad.**
 Primero las torres de IA, luego las puertas abiertas, los símbolos (bóveda y faro) y al final las puertas cerradas. El nombre sigue disponible al pasar el cursor.
+
+**D57. La agrupación de pasos vive en un módulo sin DOM y la usan todos.**
+Antes solo la lista del panel juntaba los nodos de paso; el narrador y la simulación iban nodo por nodo. Ahora hay una sola función (`src/escena/agrupar.ts`) y una sola lista para el panel, los puntos de progreso, el texto narrado y la animación. El motor no cambia: sigue entregando la ruta paso a paso.
+
+**D58. Dentro de un tramo de tránsito el intruso no se detiene.**
+Recorre los nodos de corrido, a velocidad constante, y cada edificio se tiñe al pasar. La narración del tramo aparece al llegar al primer nodo y hay una pausa corta al final. El tope de duración bajó de 24 a 20 segundos.

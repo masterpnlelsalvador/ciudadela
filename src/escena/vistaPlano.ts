@@ -367,19 +367,16 @@ export class SimulacionPlana {
     if (!opciones.pasos.length) return;
     this.terminada = false;
     const v = this.vista;
-    const primero = v.lugarDe(opciones.pasos[0].nodo);
+    const primero = v.lugarDe(opciones.pasos[0].nodos[0]);
     const base = primero ?? { ...v.puntoDeMuralla(), radio: 15 };
     let normal = primero?.normal ?? (primero ? null : v.puntoDeMuralla().normal);
     if (!normal) {
       const d = Math.hypot(base.x, base.y) || 1;
       normal = { x: base.x / d, z: base.y / d };
     }
-    const puntos = [{ x: base.x + normal.x * 150, y: base.y + normal.z * 150 }];
+    const inicio = { x: base.x + normal.x * 150, y: base.y + normal.z * 150 };
+    const puntos = [inicio];
     const ultimo = opciones.reboteEn === null ? opciones.pasos.length - 1 : opciones.reboteEn;
-    for (let k = 0; k <= ultimo; k++) {
-      const l = k === 0 ? base : v.lugarDe(opciones.pasos[k].nodo);
-      puntos.push(l ? { x: l.x, y: l.y } : puntos[puntos.length - 1]);
-    }
 
     this.rastro = document.createElementNS(SVG, 'polyline');
     this.rastro.setAttribute('class', 'plano-rastro');
@@ -397,26 +394,34 @@ export class SimulacionPlana {
     // Cada llegada es una acción; se ejecutan en orden, animadas o de golpe.
     let recorrido = `${puntos[0].x},${puntos[0].y}`;
     const acciones: Array<{ hasta: { x: number; y: number }; dur: number; pausa: number; alLlegar: () => void }> = [];
+    let desde = inicio;
     for (let k = 0; k <= ultimo; k++) {
       const esRebote = opciones.reboteEn === k;
-      const desde = puntos[k];
-      const destino = puntos[k + 1];
-      const hasta = esRebote ? { x: desde.x + (destino.x - desde.x) * 0.7, y: desde.y + (destino.y - desde.y) * 0.7 } : destino;
       const indice = k;
-      acciones.push({
-        hasta,
-        dur: k === 0 ? 1100 : 650,
-        pausa: esRebote ? 900 : opciones.pasos[k].clave ? 1900 : 350,
-        alLlegar: () => {
-          if (esRebote) {
-            v.frenar(opciones.pasos[indice].nodo);
-            this.punto?.classList.add('rebotado');
-            opciones.alRebote(indice);
-          } else {
-            v.tenir(opciones.pasos[indice].nodo);
-            opciones.alPaso(indice);
-          }
-        },
+      const paso = opciones.pasos[k];
+      // Un tramo de tránsito trae varios nodos: el punto los recorre sin detenerse.
+      const nodos = esRebote ? paso.nodos.slice(0, 1) : paso.nodos;
+      nodos.forEach((nombre, j) => {
+        const l = k === 0 && j === 0 ? base : v.lugarDe(nombre);
+        const destino = l ? { x: l.x, y: l.y } : desde;
+        const hasta = esRebote ? { x: desde.x + (destino.x - desde.x) * 0.7, y: desde.y + (destino.y - desde.y) * 0.7 } : destino;
+        const esUltimoDelPaso = j === nodos.length - 1;
+        acciones.push({
+          hasta,
+          dur: k === 0 && j === 0 ? 1100 : j === 0 ? 650 : 380,
+          pausa: esRebote ? 900 : !esUltimoDelPaso ? 0 : paso.clave ? 1900 : nodos.length > 1 ? 800 : 350,
+          alLlegar: () => {
+            if (esRebote) {
+              v.frenar(nombre);
+              this.punto?.classList.add('rebotado');
+              opciones.alRebote(indice);
+            } else {
+              v.tenir(nombre);
+              if (j === 0) opciones.alPaso(indice);
+            }
+          },
+        });
+        desde = hasta;
       });
     }
     const terminar = () => {

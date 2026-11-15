@@ -284,3 +284,28 @@ Fecha: 15 de noviembre de 2026. Objetivo: que quien entra al sitio sin contexto 
 - Workflow sintético de 45 nodos y dos workflows reales de 49 y 57 nodos: sin etiquetas encimadas (se ocultan una o dos secundarias).
 - 390×800 (vista plano) y 900×700 (3D): el plano completo queda por encima del narrador, sin desborde horizontal.
 - Capturas en `docs/capturas/`: `mejoras-t1-final-ataque-1440x900.jpg`, `mejoras-t1-final-rebote-1440x900.jpg` y `mejoras-t1-inicial-*.jpg`.
+
+### Tarea 2. Ritmo de la simulación
+
+**Qué se hizo**
+
+- Los pasos consecutivos sin regla se juntan en un solo paso narrado ("Pasa por 6 nodos sin que nadie lo revise: config, filtro_entrante…") y el intruso los recorre en un solo movimiento (D57, D58). Aplica a la escena 3D y a la vista plano.
+- Los puntos de progreso y el texto "Paso 2 de 4" cuentan los pasos agrupados.
+- El punto de rebote se traduce a la lista agrupada: tras blindar, el ataque sigue rebotando en `webhook_chatwoot`.
+- Prueba nueva: `tests/agrupar.test.ts` (7 casos), con la ruta real del ejemplo de la clínica.
+
+**Qué falló y cómo se corrigió**
+
+1. **Los botones aparecían durante el destello del rebote y luego desaparecían.** El narrador pintaba el estado final al empezar el destello, 1,5 segundos antes de la pausa del plano general. Corrección: desde el destello el narrador ya está en pausa.
+
+**Verificación** (Chrome sin interfaz, 1440×900, sin pulsar "Saltar")
+
+| Recorrido | Antes | Ahora |
+|---|---|---|
+| Clínica, ataque completo | 9 pasos, unos 22 s | 4 pasos, 16,9 s (19,5 s con la pausa final) |
+| Clínica, rebote tras blindar | — | 5,9 s desde que termina la transformación hasta los botones |
+| Formulario de leads | 4 pasos | 3 pasos, 10,6 s |
+| Clínica en vista plano (390×800) | — | 4 pasos, 11,6 s |
+
+- 185 pruebas pasan. Sin errores en consola.
+- Captura: `docs/capturas/mejoras-t2-transito-1440x900.jpg`.

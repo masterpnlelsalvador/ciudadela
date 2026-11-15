@@ -35,6 +35,7 @@ src/escena/
   plano.ts            Posiciones de n8n → parcelas, muralla y puertas.
   ciudadela.ts        Clase Ciudadela (three.js): edificios, símbolos, cámara e interacción.
   paleta.ts           Colores y nombres de los roles.
+  agrupar.ts          Agrupa los pasos de tránsito de una ruta (sin DOM; lo usan panel, narrador y simulación).
   simulacion.ts       Clase Simulacion: el intruso que recorre una ruta, o que rebota.
   vistaPlano.ts       Vista plano 2D en SVG (VistaPlano) y su simulación (SimulacionPlana).
 scripts/
@@ -140,7 +141,8 @@ Puntaje: `100 − Σ pesos` con mínimo 0 (crítico 25, alto 12, medio 6, bajo 2
 
 `src/escena/simulacion.ts` anima una `RutaAtaque` que ya calculó el motor. No decide nada: recibe la lista de nodos de la ruta y, opcionalmente, el índice del paso donde el ataque rebota.
 
-- **Línea de tiempo.** Al iniciar se calculan los tramos (de dónde a dónde, y cuándo) y los eventos (llegar a un nodo, rebotar, sacar el tesoro). Los pasos con regla se narran con una pausa de 2 segundos; los de tránsito, con 0,4. Si el total pasa de 24 segundos, se comprime.
+- **Pasos agrupados.** `agruparPasos` (en `agrupar.ts`) junta los pasos consecutivos sin regla en un solo paso con varios nodos. El primero y el último de la ruta nunca se juntan. El panel, el narrador, los puntos de progreso y la simulación usan esa misma lista; `indiceAgrupado` traduce el punto de rebote, que el motor da sobre la lista original.
+- **Línea de tiempo.** Al iniciar se calculan los tramos (de dónde a dónde, y cuándo) y los eventos (llegar a un nodo, rebotar, sacar el tesoro). Los pasos con regla se narran con una pausa de 2 segundos. Dentro de un paso de tránsito el intruso recorre todos sus nodos sin detenerse y los va tiñendo; la narración aparece al llegar al primero. Si el total pasa de 20 segundos, se comprime.
 - **Qué se ve.** Un intruso rojo entra desde fuera de la muralla por la puerta de la ruta, deja un rastro de puntos, y cada edificio al que llega se tiñe de rojo (`Ciudadela.tenir`). Al final, el tesoro (gemas doradas) sale volando por la salida afectada. La cámara lo sigue (`Ciudadela.seguir`).
 - **Rebote.** Con `reboteEn: k`, el intruso se frena antes del paso `k`, aparece un destello y un escudo, y sale despedido. Se usa cuando no hay ruta (`k = 0`: la puerta resiste) y, en la fase 4, cuando el blindaje corrigió ese paso.
 - **Sin animaciones.** Con `prefers-reduced-motion` se muestra directamente el estado final. El botón "Saltar" hace lo mismo.
