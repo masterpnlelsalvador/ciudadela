@@ -1208,11 +1208,11 @@ export class Ciudadela {
    * quepa en la parte del lienzo que la interfaz deja libre. Mira desde el sur, para que
    * la ciudad se lea igual que el canvas de n8n.
    */
-  private calcularEncuadre(m: Margenes): { posicion: THREE.Vector3; objetivo: THREE.Vector3; distancia: number } | null {
+  private calcularEncuadre(m: Margenes, lienzo?: { ancho: number; alto: number; sinEtiquetas?: boolean }): { posicion: THREE.Vector3; objetivo: THREE.Vector3; distancia: number } | null {
     const plano = this.plano;
     if (!plano) return null;
-    const ancho = Math.max(1, this.contenedor.clientWidth);
-    const alto = Math.max(1, this.contenedor.clientHeight);
+    const ancho = Math.max(1, lienzo?.ancho ?? this.contenedor.clientWidth);
+    const alto = Math.max(1, lienzo?.alto ?? this.contenedor.clientHeight);
     const { minX, maxX, minZ, maxZ } = plano.muralla;
 
     // Lo que tiene que caber: punto del mundo y cuánto ocupa en píxeles a su alrededor.
@@ -1223,7 +1223,7 @@ export class Ciudadela {
       }
     }
     for (const e of this.edificios.values()) puntos.push({ p: new THREE.Vector3(e.x, e.alto, e.z), lado: 6, arriba: 4 });
-    for (const e of this.etiquetas) puntos.push({ p: e.punto, lado: e.ancho / 2 + 4, arriba: e.alto + 4 });
+    if (!lienzo?.sinEtiquetas) for (const e of this.etiquetas) puntos.push({ p: e.punto, lado: e.ancho / 2 + 4, arriba: e.alto + 4 });
 
     // Zona libre en coordenadas normalizadas (−1…1). Si la interfaz casi no deja sitio, se ignora.
     const libreAncho = ancho - m.izq - m.der;
@@ -1274,6 +1274,41 @@ export class Ciudadela {
       distancia = Math.max(14, distancia * (1 + (escala - 1) * 0.85));
     }
     return { posicion: objetivo.clone().addScaledVector(direccion, distancia), objetivo, distancia };
+  }
+
+  /**
+   * Dibuja la ciudadela completa en una imagen del tamaño pedido, sin tocar la cámara que
+   * la persona está usando. Las etiquetas (que son HTML) no salen. Todo ocurre en el
+   * navegador. Devuelve null si no hay escena cargada.
+   */
+  capturar(ancho: number, alto: number, margenes: Margenes): HTMLCanvasElement | null {
+    const encuadre = this.calcularEncuadre(margenes, { ancho, alto, sinEtiquetas: true });
+    if (!encuadre) return null;
+    const camara = this.camara.clone();
+    camara.aspect = ancho / alto;
+    camara.updateProjectionMatrix();
+    camara.position.copy(encuadre.posicion);
+    camara.lookAt(encuadre.objetivo);
+    camara.updateMatrixWorld(true);
+
+    const tamano = this.renderer.getSize(new THREE.Vector2());
+    const densidad = this.renderer.getPixelRatio();
+    const copia = document.createElement('canvas');
+    copia.width = ancho;
+    copia.height = alto;
+    try {
+      // El lienzo cambia de tamaño solo por dentro (no su caja en la página) y se copia
+      // en el mismo instante, antes de que el navegador vuelva a pintar.
+      this.renderer.setPixelRatio(1);
+      this.renderer.setSize(ancho, alto, false);
+      this.renderer.render(this.escena, camara);
+      copia.getContext('2d')!.drawImage(this.renderer.domElement, 0, 0, ancho, alto);
+    } finally {
+      this.renderer.setPixelRatio(densidad);
+      this.renderer.setSize(tamano.x, tamano.y, false);
+      this.renderer.render(this.escena, this.camara);
+    }
+    return copia;
   }
 
   /**

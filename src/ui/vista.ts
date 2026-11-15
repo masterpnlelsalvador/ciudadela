@@ -12,6 +12,7 @@ import type { Demostracion, ZonaResaltada } from './demostracion.ts';
 import { iniciarDemostracion } from './demostracion.ts';
 import { h, icono, poner, textoRico, vaciar } from './dom.ts';
 import { ICONO, ICONO_DEFENSA } from './iconos.ts';
+import { MARGENES_TARJETA, TARJETA, archivoDeTarjeta, componerTarjeta } from './tarjeta.ts';
 
 export interface DatosVista {
   workflow: WorkflowN8n;
@@ -366,6 +367,26 @@ export function crearVista(datos: DatosVista, acciones: { alVolver(): void }): V
     );
   };
 
+  // Tarjeta para compartir: un PNG generado aquí mismo con la ciudadela blindada.
+  let tarjetaConNombre = false;
+  const descargarTarjeta = () => {
+    if (!blindaje || !(ciudadela instanceof Ciudadela)) return;
+    if (!viendoBlindado) ver(true);
+    const escena = ciudadela.capturar(TARJETA.ancho, TARJETA.alto, { ...MARGENES_TARJETA });
+    if (!escena) return;
+    const nombre = tarjetaConNombre ? original.nombre : null;
+    const tarjeta = componerTarjeta(escena, { antes: blindaje.antes.puntajes.seguridad, despues: blindaje.despues.puntajes.seguridad, nombre });
+    tarjeta.toBlob((imagen) => {
+      if (!imagen) return;
+      const url = URL.createObjectURL(imagen);
+      const enlace = h('a', { href: url, download: archivoDeTarjeta(nombre) });
+      document.body.append(enlace);
+      enlace.click();
+      enlace.remove();
+      setTimeout(() => URL.revokeObjectURL(url), 2000);
+    }, 'image/png');
+  };
+
   const verCambios = () => {
     if (!blindaje) return;
     const b = blindaje;
@@ -541,6 +562,20 @@ export function crearVista(datos: DatosVista, acciones: { alVolver(): void }): V
         h('button', { class: 'boton', type: 'button', onclick: descargarReporte }, 'Descargar reporte (Markdown)'),
         h('button', { class: 'boton', type: 'button', onclick: limpiar }, 'Limpiar para compartir'),
       ),
+      // La imagen sale de la escena 3D; en la vista plano no se ofrece.
+      ciudadela instanceof Ciudadela
+        ? h(
+            'div',
+            { class: 'blindaje-tarjeta' },
+            h('button', { class: 'boton', type: 'button', onclick: descargarTarjeta, title: 'PNG de 1200×675 generado en tu navegador' }, 'Descargar imagen para compartir'),
+            h(
+              'label',
+              { class: 'casilla' },
+              h('input', { type: 'checkbox', checked: tarjetaConNombre ? true : null, onchange: (ev: Event) => (tarjetaConNombre = (ev.target as HTMLInputElement).checked) }),
+              'Incluir el nombre del workflow',
+            ),
+          )
+        : null,
       h(
         'div',
         { class: 'blindaje-pie' },
@@ -941,6 +976,8 @@ export function crearVista(datos: DatosVista, acciones: { alVolver(): void }): V
   botonModo.addEventListener('click', () => {
     modo = modo === '3d' ? 'plano' : '3d';
     montarEscena();
+    // La tarjeta de blindaje ofrece la imagen para compartir solo en 3D.
+    if (blindaje && blindaje.cambios.length) pintarPanel();
   });
   escenario.append(botonModo);
   if (!hay3D) escenario.append(h('p', { class: 'escenario-aviso' }, 'Tu navegador no tiene WebGL: se muestra la vista plano, con la misma información.'));

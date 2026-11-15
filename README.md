@@ -119,3 +119,7 @@ El sitio incluye etiquetas Open Graph y de X, con la imagen `public/ciudadela-og
 En la pantalla inicial, "Ver demostración (1 min)" recorre sola los tres actos con el ejemplo de la clínica. Cualquier clic, tecla o toque la detiene y deja la aplicación lista para usar.
 
 Para abrirla directamente, agrega `#demo` al final de la dirección del sitio (por ejemplo `https://ciudadela0.netlify.app/#demo`).
+
+## Imagen para compartir
+
+Después de blindar, "Descargar imagen para compartir" genera un PNG de 1200×675 con la ciudadela blindada y el cambio de puntaje. Se crea en tu navegador, sin enviar nada. El nombre del workflow no aparece salvo que marques la casilla "Incluir el nombre del workflow". Está disponible en la vista 3D.

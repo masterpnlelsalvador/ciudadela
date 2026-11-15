@@ -2154,3 +2154,28 @@ button.acto:disabled {
     justify-content: center;
   }
 }
+
+/* --- Tarjeta para compartir ---------------------------------------------------- */
+.blindaje-tarjeta {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px 14px;
+}
+.blindaje-tarjeta .boton {
+  font-size: 13.5px;
+  padding: 7px 11px;
+}
+.casilla {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  font-size: 13px;
+  color: var(--tenue);
+  cursor: pointer;
+}
+.casilla input {
+  width: 15px;
+  height: 15px;
+  accent-color: var(--ambar);
+}

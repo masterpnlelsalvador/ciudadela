@@ -229,3 +229,12 @@ Condiciones: un único Set que cierra, formato de asignaciones, conectado direct
 
 **D71. El ejemplo 2 blindado pasa de lógica 94 a 100.**
 Tiene el mismo patrón que el formulario real: `Append row in sheet` usa `$json.phone` y `Edit Fields` no lo asigna. Con D70 se corrige solo. Los puntajes del análisis de los tres ejemplos (0/100, 84/82 y 100/100) no cambian.
+
+**D72. La tarjeta se dibuja desde la escena real, a su propio tamaño.**
+No es una captura de pantalla recortada. La escena se vuelve a dibujar a 1200×675 con el mismo cálculo de encuadre, reservando las franjas de los textos. Así la imagen queda igual en cualquier pantalla.
+
+**D73. Privado por defecto, también en el nombre del archivo.**
+Sin marcar la casilla, ni la imagen ni el archivo (`ciudadela-blindada.png`) llevan el nombre del workflow. Las etiquetas de los nodos tampoco salen, porque son HTML y no forman parte del lienzo.
+
+**D74. La tarjeta solo se ofrece en la vista 3D.**
+La vista plano es SVG con estilos de la hoja de estilos; convertirla en imagen exigiría copiar esos estilos dentro del SVG. No se hizo en esta pasada.

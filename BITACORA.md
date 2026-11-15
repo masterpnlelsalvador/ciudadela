@@ -393,3 +393,24 @@ Se volvió a generar `public/estudio.json` con la misma muestra de 500 plantilla
 - En la interfaz, el ejemplo 2 blindado muestra "Seguridad 84 → 98 · Lógica 82 → 100" y, en "Ver cambios", "CIM-3 · Campo que faltaba agregado al Set" con la marca "Cambia el comportamiento".
 - Blindar dos veces no cambia nada.
 - **Sin verificar:** la importación en n8n del ejemplo 2 blindado. Quedó en `docs/verificacion/formulario-leads-agencia-blindado.json` para probarla.
+
+### Tarea 6 (opcional). Tarjeta para compartir
+
+**Qué se hizo**
+
+- Botón "Descargar imagen para compartir" en la tarjeta del acto 3: PNG de 1200×675 con la ciudadela blindada, "Seguridad 0 → 92" y "Ciudadela · auditoría para workflows de n8n" (D72).
+- Casilla "Incluir el nombre del workflow", desmarcada por defecto (D73).
+- Todo se genera en el navegador con canvas.
+- Prueba nueva: `tests/tarjeta.test.ts` (4 casos) sobre los textos y el nombre del archivo.
+
+**Qué falló y cómo se corrigió**
+
+Nada falló en esta tarea.
+
+**Verificación** (Chrome sin interfaz)
+
+- Se descargaron dos archivos: `ciudadela-blindada.png` y, con la casilla marcada, uno con el nombre del ejemplo. Los dos son PNG de 1200×675 (unos 370 kB).
+- Cero peticiones de red al generarlos. El lienzo de la escena conserva su tamaño después de la captura.
+- Antes de blindar y en la vista plano el botón no aparece (D74); al volver a 3D reaparece y la casilla conserva su estado.
+- Consola limpia. 221 pruebas pasan.
+- Muestra: `docs/capturas/mejoras-t6-tarjeta.png`.

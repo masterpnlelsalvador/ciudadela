@@ -32,6 +32,7 @@ src/ui/
   iconos.ts           Iconos SVG de las defensas.
   estudio.ts          Sección "Lo que encontramos en N plantillas públicas" (lee estudio.json).
   demostracion.ts     Demostración guiada: guion (textos a partir del análisis) y franja inferior.
+  tarjeta.ts          Tarjeta para compartir: compone un PNG de 1200×675 en un canvas.
 src/escena/
   plano.ts            Posiciones de n8n → parcelas, muralla y puertas.
   ciudadela.ts        Clase Ciudadela (three.js): edificios, símbolos, cámara e interacción.
@@ -152,6 +153,16 @@ Puntaje: `100 − Σ pesos` con mínimo 0 (crítico 25, alto 12, medio 6, bajo 2
 **Final.** Cuando la simulación termina (llegó o rebotó), `vista.ts` mide qué parte del lienzo tapa el narrador (`areaLibre`) y pide un plano general en la zona libre. Los botones del narrador aparecen después de una pausa de 2,6 segundos, para que el plano final se vea solo.
 
 La narración (`vista.ts`, bloque "Acto 2") toma los textos de `ruta.pasos[i].texto`, que escribe `src/engine/rutas.ts`. La interfaz no redacta nada por su cuenta.
+
+## Tarjeta para compartir
+
+En el acto 3, "Descargar imagen para compartir" genera un PNG de 1200×675 con la ciudadela blindada, "Seguridad 0 → 92" y "Ciudadela · auditoría para workflows de n8n".
+
+1. `Ciudadela.capturar(ancho, alto, margenes)` dibuja la escena en ese tamaño con una copia de la cámara, encuadrada para dejar libres las franjas de los textos. Cambia el tamaño interno del lienzo, copia la imagen a otro canvas y lo restaura en el mismo instante: la cámara de la persona no se mueve. Las etiquetas, que son HTML, no salen.
+2. `componerTarjeta` (en `src/ui/tarjeta.ts`) dibuja encima los velos y los textos con la API 2D de canvas.
+3. `canvas.toBlob` produce el PNG y se descarga con un enlace `blob:`.
+
+No hay peticiones de red. El nombre del workflow no aparece en la imagen ni en el nombre del archivo salvo que se marque la casilla "Incluir el nombre del workflow". Solo se ofrece con la escena 3D.
 
 ## Demostración guiada
 
