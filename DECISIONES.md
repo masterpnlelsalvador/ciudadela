@@ -214,3 +214,18 @@ No estaba pedido. Sirve para compartir un link que abre la demostración sin que
 
 **D66. La franja de subtítulos es una fila propia, no una capa.**
 En escritorio no tapa ni el reporte ni la ciudadela. En pantallas angostas, donde la página se desplaza, se ancla abajo y el narrador se coloca encima usando el alto real de la franja.
+
+**D67. CIM-1 se repara campo por campo.**
+Antes, un solo campo que no terminara en un literal dejaba todo el nodo sin corregir. Ahora cada campo se decide por separado. El hallazgo se anuncia como autocorregible solo si el blindaje repara todos sus campos; si repara algunos, lo hace igual, lo dice en "Ver cambios" y el hallazgo queda pendiente con los campos dudosos. Así se mantiene la regla de que todo lo anunciado como autocorregible desaparece al volver a analizar.
+
+**D68. Qué cadena perdida se considera inequívoca.**
+Se escribe `||` entre todos los operandos cuando el último es un valor por defecto (literal, `$now` o `$today`). Con dos operandos el de la izquierda puede ser cualquier expresión válida, como ya ocurría. Con tres o más, los anteriores deben ser lecturas de `$json` (incluido `$json.body`): es el patrón "este campo, o este otro, o un valor fijo". Dos lecturas seguidas sin valor por defecto, o una llamada en medio, quedan como corrección manual.
+
+**D69. Un respaldo que no existe no es un campo perdido.**
+En `$json.company || $json.companyOrProjectName || ""`, si el Set asigna `company`, que `companyOrProjectName` no exista no rompe nada. CIM-3 solo deja de reportarlo cuando el campo aparece únicamente como respaldo; si además se usa por su cuenta en otro campo, se reporta.
+
+**D70. El campo que falta se agrega al Set solo cuando el Set copia el body de un webhook.**
+Condiciones: un único Set que cierra, formato de asignaciones, conectado directamente a un webhook y que ya copie campos de la entrada. Entonces el campo que un nodo posterior necesita se agrega como `$json.body.<campo>`, igual que los demás. Es una suposición razonable, no una certeza: Ciudadela no sabe qué envía el formulario. Por eso aparece como "Cambia el comportamiento" y el detalle pide confirmar el nombre del campo. Fuera de ese caso (Set tras otro tipo de entrada, Set con valores fijos, formato antiguo) sigue siendo corrección manual.
+
+**D71. El ejemplo 2 blindado pasa de lógica 94 a 100.**
+Tiene el mismo patrón que el formulario real: `Append row in sheet` usa `$json.phone` y `Edit Fields` no lo asigna. Con D70 se corrige solo. Los puntajes del análisis de los tres ejemplos (0/100, 84/82 y 100/100) no cambian.

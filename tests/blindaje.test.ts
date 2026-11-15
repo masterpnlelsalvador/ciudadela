@@ -229,9 +229,12 @@ describe('Blindaje del ejemplo 2 (formulario)', () => {
     expect(r.despues.hallazgos.map((h) => h.regla)).not.toContain('CIM-2');
   });
 
-  it('deja como guía manual lo que es ambiguo (CIM-3)', () => {
-    expect(r.pendientes.map((h) => h.regla)).toContain('CIM-3');
-    expect(r.despues.puntajes).toEqual({ seguridad: 98, logica: 94 });
+  it('agrega al Set el campo que el nodo siguiente necesita (CIM-3)', () => {
+    const cambio = r.cambios.find((c) => c.regla === 'CIM-3')!;
+    expect(cambio.cambiaComportamiento).toBe(true);
+    expect(cambio.detalle).toContain('`$json.body.phone`');
+    expect(r.pendientes.map((h) => h.regla)).not.toContain('CIM-3');
+    expect(r.despues.puntajes).toEqual({ seguridad: 98, logica: 100 });
   });
 });
 

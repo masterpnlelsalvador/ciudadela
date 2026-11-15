@@ -4,8 +4,8 @@
 import fs from 'node:fs';
 import path from 'node:path';
 import { describe, expect, it } from 'vitest';
-import { analizar } from '../src/engine/index.ts';
-import type { Analisis } from '../src/engine/index.ts';
+import { analizar, blindar } from '../src/engine/index.ts';
+import type { Analisis, ResultadoBlindaje } from '../src/engine/index.ts';
 
 const carpeta = path.join(__dirname, '..', 'test-fixtures', 'privados');
 
@@ -22,6 +22,9 @@ function buscar(...nombres: string[]): string | null {
 }
 
 const cargar = (archivo: string): Analisis => analizar(fs.readFileSync(archivo, 'utf8'));
+const blindado = (archivo: string | null): ResultadoBlindaje => blindar(JSON.parse(fs.readFileSync(archivo!, 'utf8')));
+const asignaciones = (r: ResultadoBlindaje, nombre: string): Record<string, string> =>
+  Object.fromEntries(((r.workflow.nodes.find((n) => n.name === nombre)?.parameters?.assignments as { assignments: Array<{ name: string; value: string }> }).assignments ?? []).map((x) => [x.name, x.value]));
 const reglas = (a: Analisis) => [...new Set(a.hallazgos.map((h) => h.regla))].sort();
 const nodosDe = (a: Analisis, regla: string) => a.hallazgos.filter((h) => h.regla === regla).flatMap((h) => h.nodos);
 const sin = (a: Analisis, prefijos: string[]) => {
@@ -102,6 +105,24 @@ oro('Alkyora - Contact Form Lead Capture (versión original)', buscar('Alkyora_-
     expect(nodosDe(a(), 'VIG-2')).toEqual(expect.arrayContaining(['Append row in sheet', 'Send a message']));
   });
   it('sin falsas alarmas', () => sin(a(), ['LLA-', 'PUE-4']));
+  it('no reporta CIM-3 por companyOrProjectName: solo es el respaldo de company', () => {
+    expect(reglas(a())).not.toContain('CIM-3');
+    expect(a().puntajes.logica).toBe(82);
+  });
+  it('todos los hallazgos de lógica son autocorregibles', () => {
+    for (const h of a().hallazgos.filter((x) => x.area === 'cimientos')) expect(h.autocorregible, `${h.regla} en ${h.nodos[0]}`).toBe(true);
+  });
+  it('tras blindar queda con lógica 100 y las cadenas completas', () => {
+    const r = blindado(buscar('Alkyora_-_Contact_Form_Lead_Capture.json'));
+    expect(r.despues.puntajes.logica).toBe(100);
+    expect(r.pendientes.filter((h) => h.area === 'cimientos')).toEqual([]);
+    const campos = asignaciones(r, 'Edit Fields');
+    expect(campos.company).toBe('={{ $json.body.company || $json.body.companyOrProjectName || "" }}');
+    expect(campos.submittedAt).toBe('={{ $json.body.submittedAt || $now }}');
+    expect(campos.source).toBe('={{ $json.body.source || "Alkyora Contact Form" }}');
+    const hoja = r.workflow.nodes.find((n) => n.name === 'Append row in sheet')!.parameters!.columns as { value: Record<string, string> };
+    expect(hoja.value.company).toBe('={{ $json.company || $json.companyOrProjectName || "" }}');
+  });
 });
 
 oro('Alkyora - Checklist Lead Capture', buscar('Alkyora_-_Checklist_Lead_Capture.json'), (a) => {
@@ -118,6 +139,20 @@ oro('Alkyora - Checklist Lead Capture', buscar('Alkyora_-_Checklist_Lead_Capture
     expect(a().hallazgos.find((h) => h.regla === 'TES-1')?.severidad).toBe('bajo');
     expect(reglas(a())).toContain('VIG-1');
     expect(nodosDe(a(), 'VIG-2')).toContain('Append row in sheet');
+  });
+  it('CIM-3 por email es autocorregible: el Set copia el body del webhook', () => {
+    const cim3 = a().hallazgos.find((h) => h.regla === 'CIM-3')!;
+    expect(cim3.datos?.campos).toEqual(['email']);
+    expect(cim3.autocorregible).toBe(true);
+  });
+  it('tras blindar queda con lógica 100 y el Set asigna email desde el body', () => {
+    const r = blindado(buscar('Alkyora_-_Checklist_Lead_Capture.json'));
+    expect(r.despues.puntajes.logica).toBe(100);
+    expect(r.pendientes.filter((h) => h.area === 'cimientos')).toEqual([]);
+    expect(asignaciones(r, 'Edit Fields').email).toBe('={{ $json.body.email }}');
+    const cambio = r.cambios.find((c) => c.regla === 'CIM-3')!;
+    expect(cambio.cambiaComportamiento).toBe(true);
+    expect(cambio.nodos).toEqual(['Edit Fields', 'Append row in sheet']);
   });
 });
 

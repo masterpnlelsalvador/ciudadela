@@ -4,7 +4,7 @@ import type { Contexto } from '../contexto.ts';
 import { crearHallazgo, lista, plural } from '../contexto.ts';
 import { esCodigo, esDePaso, esSet, esTrigger, esWebhook } from '../clasificar.ts';
 import { describirSet } from '../contaminacion.ts';
-import { esExpresion, extraerRefs, revisarExpresion, segmentos } from '../expresiones.ts';
+import { campoDeLecturaJson, esExpresion, extraerRefs, operandosDeCadena, operandosPerdidos, revisarExpresion, segmentos } from '../expresiones.ts';
 
 const CAMPOS_DEL_WEBHOOK = new Set(['body', 'headers', 'params', 'query', 'webhookUrl', 'executionMode', 'binary']);
 
@@ -16,6 +16,25 @@ export interface FallaDeSintaxis {
   izquierda?: string;
   derecha?: string;
   detalle?: string;
+  /** Operandos de la cadena, cuando la falla es un operador perdido. */
+  operandos?: string[];
+  /** true si el blindaje puede reparar este campo escribiendo `||` entre los operandos. */
+  corregible: boolean;
+}
+
+const VALOR_POR_DEFECTO = /^(['"`]|\d|\$now\b|\$today\b)/;
+
+/**
+ * Una cadena con el operador perdido se puede reparar sola cuando su último operando es
+ * un valor por defecto (un literal, `$now` o `$today`). Con tres operandos o más, los
+ * anteriores deben ser lecturas de `$json`: es el patrón "este campo, o este otro, o un
+ * valor fijo". En cualquier otro caso el campo queda como corrección manual.
+ */
+export function operandosCorregibles(operandos: string[] | null | undefined): boolean {
+  if (!operandos || operandos.length < 2) return false;
+  if (!VALOR_POR_DEFECTO.test(operandos[operandos.length - 1])) return false;
+  if (operandos.length === 2) return true;
+  return operandos.slice(0, -1).every((o) => campoDeLecturaJson(o) !== null);
 }
 
 /** Nombre legible del campo al que pertenece un parámetro. */
@@ -48,6 +67,7 @@ export function fallasDeSintaxis(n: NodoN8n): FallaDeSintaxis[] {
       if (!esExpresion(valor)) return;
       for (const s of revisarExpresion(valor)) {
         if (s.sintaxis.ok) continue;
+        const operandos = s.sintaxis.tipo === 'operador_perdido' ? (operandosPerdidos(s.codigo) ?? undefined) : undefined;
         fallas.push({
           ruta,
           campo: nombreDeCampo(n, ruta),
@@ -56,6 +76,8 @@ export function fallasDeSintaxis(n: NodoN8n): FallaDeSintaxis[] {
           izquierda: s.sintaxis.tipo === 'operador_perdido' ? s.sintaxis.izquierda : undefined,
           derecha: s.sintaxis.tipo === 'operador_perdido' ? s.sintaxis.derecha : undefined,
           detalle: s.sintaxis.tipo === 'invalida' ? s.sintaxis.detalle : undefined,
+          operandos,
+          corregible: operandosCorregibles(operandos),
         });
       }
     } else if (Array.isArray(valor)) {
@@ -102,6 +124,28 @@ export function lecturasFueraDeBody(n: NodoN8n): LecturaFueraDeBody[] {
   return lecturas;
 }
 
+const NOMBRE_SIMPLE = /^[A-Za-z_$][\w$]*$/;
+
+/**
+ * Un campo que falta se puede agregar al Set cuando hay un solo Set que cierra, ese Set
+ * usa el formato de asignaciones, está conectado directamente a un webhook y ya copia
+ * campos de lo que llega (`$json.campo` o `$json.body.campo`). Entonces el campo que
+ * falta se copia igual que los demás, desde `$json.body`. Devuelve el nombre del Set o null.
+ */
+export function setDondeAgregar(ctx: Contexto, sets: string[], campos: string[]): string | null {
+  if (sets.length !== 1 || !campos.length) return null;
+  if (!campos.every((c) => NOMBRE_SIMPLE.test(c) && !CAMPOS_DEL_WEBHOOK.has(c))) return null;
+  const set = ctx.porNombre.get(sets[0]);
+  if (!set || set.disabled) return null;
+  const d = describirSet(set);
+  const asignaciones = (set.parameters?.assignments as { assignments?: unknown } | undefined)?.assignments;
+  if (!d.moderno || !d.conocido || !Array.isArray(asignaciones)) return null;
+  const entradas = ctx.grafo.predecesores(set.name);
+  if (!entradas.length || !entradas.every((a) => esWebhook(ctx.porNombre.get(a.desde) ?? ({ type: '' } as NodoN8n)))) return null;
+  const copiaDelWebhook = d.asignaciones.some((a) => esExpresion(a.valor) && segmentos(a.valor).some((s) => extraerRefs(s.codigo).some((r) => r.tipo === 'json' && r.ruta.length > 0)));
+  return copiaDelWebhook ? set.name : null;
+}
+
 /** Sets cerrados (sin "incluir otros campos") de los que depende la entrada de un nodo. */
 function setsQueCierran(ctx: Contexto, nombre: string): string[] {
   const hallados: string[] = [];
@@ -137,7 +181,9 @@ export function reglasCimientos(ctx: Contexto): Hallazgo[] {
     const campos = [...new Set(fallas.map((f) => f.campo))];
     const perdidos = fallas.filter((f) => f.tipo === 'operador_perdido');
     const todosPerdidos = perdidos.length === fallas.length;
-    const corregible = todosPerdidos && perdidos.every((f) => /^(['"`]|\d|\$now\b|\$today\b)/.test(f.derecha ?? ''));
+    // El hallazgo se anuncia como corregible solo si el blindaje repara todos sus campos.
+    // Si repara algunos, lo hace igual y el hallazgo queda con los campos dudosos.
+    const corregible = todosPerdidos && perdidos.every((f) => f.corregible);
     hallazgos.push(
       crearHallazgo(ctx, {
         regla: 'CIM-1',
@@ -146,10 +192,10 @@ export function reglasCimientos(ctx: Contexto): Hallazgo[] {
         titulo: todosPerdidos ? 'Valores por defecto que no funcionan' : 'Expresiones con errores de sintaxis',
         nodos: [n.name],
         explicacion: todosPerdidos
-          ? `En «${n.name}», ${plural(campos.length, 'el campo', 'los campos')} ${campos.map((c) => `\`${c}\``).join(', ')} ${plural(campos.length, 'tiene', 'tienen')} dos valores seguidos sin un operador entre ellos. Casi seguro se perdió un \`||\` o \`??\`: el valor por defecto no se aplica y la expresión falla o devuelve algo inesperado.`
+          ? `En «${n.name}», ${plural(campos.length, 'el campo', 'los campos')} ${campos.map((c) => `\`${c}\``).join(', ')} ${plural(campos.length, 'tiene', 'tienen')} valores seguidos sin un operador entre ellos. Casi seguro se perdió un \`||\` o \`??\`: el valor por defecto no se aplica y la expresión falla o devuelve algo inesperado.`
           : `En «${n.name}», ${plural(campos.length, 'la expresión del campo', 'las expresiones de los campos')} ${campos.map((c) => `\`${c}\``).join(', ')} no ${plural(campos.length, 'es', 'son')} JavaScript válido. n8n mostrará un error o un valor vacío al ejecutarlo.`,
         correccion: todosPerdidos
-          ? 'Escribe el operador que falta entre los dos valores, por ejemplo {{ $json.campo || "Valor por defecto" }}.'
+          ? 'Escribe el operador que falta entre los valores, por ejemplo {{ $json.campo || "Valor por defecto" }}.'
           : 'Abre el campo en n8n y corrige la expresión: el editor marca en rojo dónde está el problema.',
         autocorregible: corregible,
         datos: { fallas },
@@ -192,10 +238,18 @@ export function reglasCimientos(ctx: Contexto): Hallazgo[] {
       if (typeof valor === 'string') {
         if (!esExpresion(valor)) return;
         for (const s of segmentos(valor)) {
-          for (const r of extraerRefs(s.codigo)) {
-            if (r.tipo !== 'json' || !r.ruta.length) continue;
-            if (!entrada.campos.has(r.ruta[0])) faltantes.add(r.ruta[0]);
-          }
+          // En "$json.a || $json.b || valor", si el Set asigna `a`, `b` es solo un respaldo:
+          // que no exista no rompe nada, así que no se reporta.
+          const operandos = operandosDeCadena(s.codigo);
+          const primero = operandos.length > 1 ? campoDeLecturaJson(operandos[0]) : null;
+          const esCadenaConRespaldo = primero !== null && entrada.campos.has(primero);
+          operandos.forEach((operando, i) => {
+            if (esCadenaConRespaldo && i > 0) return;
+            for (const r of extraerRefs(operando)) {
+              if (r.tipo !== 'json' || !r.ruta.length) continue;
+              if (!entrada.campos.has(r.ruta[0])) faltantes.add(r.ruta[0]);
+            }
+          });
         }
       } else if (Array.isArray(valor)) {
         valor.forEach(visitar);
@@ -208,6 +262,7 @@ export function reglasCimientos(ctx: Contexto): Hallazgo[] {
     const sets = setsQueCierran(ctx, n.name);
     if (!sets.length) continue;
     const campos = [...faltantes];
+    const agregarA = setDondeAgregar(ctx, sets, campos);
     hallazgos.push(
       crearHallazgo(ctx, {
         regla: 'CIM-3',
@@ -216,8 +271,8 @@ export function reglasCimientos(ctx: Contexto): Hallazgo[] {
         nodos: [n.name, ...sets],
         explicacion: `«${n.name}» usa ${campos.map((c) => `\`$json.${c}\``).join(', ')}, pero ${lista(sets)} no ${plural(sets.length, 'asigna', 'asignan')} ${plural(campos.length, 'ese campo', 'esos campos')} ni ${plural(sets.length, 'conserva', 'conservan')} los demás ("Include Other Input Fields" está apagado). ${plural(campos.length, 'Ese campo llega vacío', 'Esos campos llegan vacíos')}.`,
         correccion: `Agrega ${plural(campos.length, 'el campo', 'los campos')} al nodo Set o activa "Include Other Input Fields".`,
-        autocorregible: false,
-        datos: { campos, sets },
+        autocorregible: agregarA !== null,
+        datos: { campos, sets, agregarA },
       }),
     );
   }

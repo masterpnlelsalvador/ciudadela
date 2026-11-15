@@ -173,7 +173,7 @@ La demostración no analiza ni anima nada por su cuenta. Recibe de `vista.ts` un
 
 Orden de trabajo:
 
-1. **Dentro de los nodos:** LLA-2 (vacía el secreto del Set), LLA-3 (header armado a mano → credencial marcador), POD-1, POD-2, POD-3, CAM-1, CAM-2, CIM-1, CIM-2 y VIG-2.
+1. **Dentro de los nodos:** LLA-2 (vacía el secreto del Set), LLA-3 (header armado a mano → credencial marcador), POD-1, POD-2, POD-3, CAM-1, CAM-2, CIM-1, CIM-2, CIM-3 y VIG-2.
 2. **Puertas:** PUE-1 (Header Auth con credencial marcador, o nodo de validación si es un formulario público), PUE-3.
 3. **Nodos nuevos:** `filtro_de_entrada` antes de cada IA con MEN-1 o MEN-2, y `host_esperado` antes de cada descarga con TUN-1.
 4. **Ajustes del workflow:** `errorWorkflow` con marcador, `pinData` vacío y bloques de exportación fuera.
@@ -186,6 +186,14 @@ Reglas de diseño:
 - **Credenciales nuevas.** Siempre `{ id: "", name: "CONFIGURA: …" }`.
 - **Idempotente.** Blindar un workflow ya blindado no produce cambios.
 - **El filtro de entrada** traslada el prompt original a un nodo Code (`plantillaAJs`). Si el prompt usa funciones que solo existen en las expresiones de n8n, no se traslada y el hallazgo queda como guía manual.
+
+**Reparación de la lógica** (`corregirLogica`), en tres pasadas:
+
+1. **CIM-1, campo por campo.** Cada falla trae sus `operandos` y si es `corregible`. Una cadena con el operador perdido se repara escribiendo `||` entre todos los operandos cuando el último es un valor por defecto (literal, `$now` o `$today`) y, si hay tres o más, los anteriores son lecturas de `$json`. Un campo dudoso no bloquea a los demás: queda en el hallazgo, que entonces sigue pendiente.
+2. **CIM-2.** Las lecturas `$json.campo` justo después de un webhook pasan a `$json.body.campo`. Va después de CIM-1 porque CIM-1 busca el texto original de la expresión.
+3. **CIM-3.** Si hay un solo Set que cierra, usa asignaciones, viene directo de un webhook y ya copia campos de la entrada, el campo que falta se agrega al Set como `$json.body.<campo>` (`setDondeAgregar`, en `reglas/cimientos.ts`). Se marca como cambio de comportamiento.
+
+CIM-3 no reporta un campo que solo aparece como respaldo en una cadena (`$json.a || $json.b || ""`, o la misma cadena con los operadores perdidos) cuyo primer operando sí lo asigna el Set.
 
 `puntoDeRebote(ruta, despues)` devuelve el primer paso de una ruta original cuyo hallazgo ya no existe: ahí rebota el ataque repetido. `limpiarParaCompartir(workflow)` devuelve una copia sin bloques de la instancia, con las credenciales como marcadores y `pinData` vacío.
 

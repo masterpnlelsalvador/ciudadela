@@ -192,6 +192,72 @@ export function revisarSintaxis(codigo: string): Sintaxis {
   return { ok: false, tipo: 'invalida', detalle: r.mensaje.replace(/\s*\(\d+:\d+\)\s*$/, '') };
 }
 
+/**
+ * Operandos de una cadena de valores seguidos sin operador entre ellos
+ * (`$json.a ⏎ $json.b ⏎ ""` → tres operandos). null si el código no es una cadena así.
+ */
+export function operandosPerdidos(codigo: string): string[] | null {
+  const operandos: string[] = [];
+  let resto = codigo.trim().replace(/;+\s*$/, '');
+  for (let vuelta = 0; vuelta < 16; vuelta++) {
+    const s = revisarSintaxis(resto);
+    if (s.ok) {
+      operandos.push(resto.trim());
+      return operandos.length > 1 ? operandos : null;
+    }
+    if (s.tipo !== 'operador_perdido') return null;
+    operandos.push(s.izquierda);
+    resto = s.derecha;
+  }
+  return null;
+}
+
+/**
+ * Operandos de una cadena de respaldos: `a || b ?? c`, o la misma cadena con los
+ * operadores perdidos. Si el código no es una cadena, devuelve un solo elemento.
+ */
+export function operandosDeCadena(codigo: string): string[] {
+  const limpio = codigo.trim().replace(/;+\s*$/, '');
+  if (!limpio) return [];
+  const perdidos = operandosPerdidos(limpio);
+  if (perdidos) return perdidos.flatMap((p) => operandosDeCadena(p));
+  const fuente = `(\n${limpio}\n)`;
+  try {
+    const programa = parse(fuente, { ecmaVersion: 'latest' }) as unknown as { body: Array<{ expression?: NodoAst }> };
+    const partes: string[] = [];
+    const aplanar = (nodo: NodoAst | undefined): void => {
+      if (!nodo) return;
+      if (nodo.type === 'LogicalExpression' && (nodo.operator === '||' || nodo.operator === '??')) {
+        aplanar(nodo.left);
+        aplanar(nodo.right);
+      } else {
+        partes.push(fuente.slice(nodo.start, nodo.end));
+      }
+    };
+    aplanar(programa.body[0]?.expression);
+    return partes.length ? partes : [limpio];
+  } catch {
+    return [limpio];
+  }
+}
+
+interface NodoAst {
+  type: string;
+  start: number;
+  end: number;
+  operator?: string;
+  left?: NodoAst;
+  right?: NodoAst;
+}
+
+/** Si el operando es solo una lectura de `$json` (por ejemplo `$json.body.email`), devuelve su primer campo; si no, null. */
+export function campoDeLecturaJson(operando: string): string | null {
+  const limpio = operando.trim();
+  if (!/^\$json(?:\s*\??\.\s*[A-Za-z_$][\w$]*|\s*\[\s*(?:'[^'\]]*'|"[^"\]]*"|\d+)\s*\])+$/.test(limpio)) return null;
+  const refs = extraerRefs(limpio).filter((r) => r.tipo === 'json' && r.ruta.length > 0);
+  return refs.length === 1 ? refs[0].ruta[0] : null;
+}
+
 export interface SegmentoRevisado extends Segmento {
   sintaxis: Sintaxis;
 }

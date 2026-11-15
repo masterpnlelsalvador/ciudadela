@@ -677,27 +677,41 @@ function corregirCaminos(t: Taller, hallazgos: Hallazgo[]): void {
 }
 
 function corregirLogica(t: Taller, hallazgos: Hallazgo[]): void {
+  // 1. CIM-1, campo por campo. Va primero: busca el texto original de cada expresión,
+  //    que CIM-2 cambia después. Un campo dudoso no impide reparar los demás.
+  for (const h of hallazgos) {
+    const n = t.nodo(h.nodos[0]);
+    if (!n || h.regla !== 'CIM-1') continue;
+    const corregidos: string[] = [];
+    const dudosos: string[] = [];
+    for (const f of (h.datos?.fallas as FallaDeSintaxis[] | undefined) ?? []) {
+      const valor = leerEn(n.parameters, f.ruta);
+      if (!f.corregible || !f.operandos || typeof valor !== 'string') {
+        dudosos.push(f.campo);
+        continue;
+      }
+      const nuevo = valor.replace(`{{${f.codigo}}}`, () => `{{ ${f.operandos!.join(' || ')} }}`);
+      if (nuevo !== valor && escribirEn(n.parameters, f.ruta, nuevo)) corregidos.push(f.campo);
+      else dudosos.push(f.campo);
+    }
+    if (corregidos.length) {
+      const pendientes = [...new Set(dudosos)].filter((c) => !corregidos.includes(c));
+      t.cambios.push({
+        regla: 'CIM-1',
+        titulo: 'Valores por defecto reparados',
+        detalle:
+          `En «${n.name}» se escribió el \`||\` que faltaba en ${[...new Set(corregidos)].map((c) => `\`${c}\``).join(', ')}.` +
+          (pendientes.length ? ` ${pendientes.map((c) => `\`${c}\``).join(', ')} ${pendientes.length === 1 ? 'queda' : 'quedan'} para revisar a mano: no está claro qué operador falta.` : ''),
+        nodos: [n.name],
+        cambiaComportamiento: true,
+      });
+    }
+  }
+
+  // 2. CIM-2: lecturas del webhook fuera de body.
   for (const h of hallazgos) {
     const n = t.nodo(h.nodos[0]);
     if (!n) continue;
-    if (h.regla === 'CIM-1' && h.autocorregible) {
-      const corregidos: string[] = [];
-      for (const f of (h.datos?.fallas as FallaDeSintaxis[] | undefined) ?? []) {
-        const valor = leerEn(n.parameters, f.ruta);
-        if (typeof valor !== 'string' || !f.izquierda || !f.derecha) continue;
-        const nuevo = valor.replace(`{{${f.codigo}}}`, `{{ ${f.izquierda} || ${f.derecha} }}`);
-        if (nuevo !== valor && escribirEn(n.parameters, f.ruta, nuevo)) corregidos.push(f.campo);
-      }
-      if (corregidos.length) {
-        t.cambios.push({
-          regla: 'CIM-1',
-          titulo: 'Valores por defecto reparados',
-          detalle: `En «${n.name}» se escribió el \`||\` que faltaba en ${[...new Set(corregidos)].map((c) => `\`${c}\``).join(', ')}.`,
-          nodos: [n.name],
-          cambiaComportamiento: true,
-        });
-      }
-    }
     if (h.regla === 'CIM-2') {
       const campos = new Set<string>();
       const porRuta = new Map<string, { ruta: string[]; campos: Set<string> }>();
@@ -725,6 +739,38 @@ function corregirLogica(t: Taller, hallazgos: Hallazgo[]): void {
         });
       }
     }
+  }
+
+  // 3. CIM-3: el campo que un nodo posterior necesita y el Set no asigna se agrega al Set,
+  //    copiado desde el body del webhook como los demás.
+  const porSet = new Map<string, { campos: string[]; usuarios: string[] }>();
+  for (const h of hallazgos) {
+    const destino = h.datos?.agregarA;
+    if (h.regla !== 'CIM-3' || !h.autocorregible || typeof destino !== 'string') continue;
+    const grupo = porSet.get(destino) ?? { campos: [], usuarios: [] };
+    for (const c of (h.datos?.campos as string[] | undefined) ?? []) if (!grupo.campos.includes(c)) grupo.campos.push(c);
+    if (!grupo.usuarios.includes(h.nodos[0])) grupo.usuarios.push(h.nodos[0]);
+    porSet.set(destino, grupo);
+  }
+  for (const [nombre, grupo] of porSet) {
+    const set = t.nodo(nombre);
+    const asignaciones = (set?.parameters?.assignments as { assignments?: Array<Record<string, unknown>> } | undefined)?.assignments;
+    if (!set || !Array.isArray(asignaciones)) continue;
+    const agregados: string[] = [];
+    for (const campo of grupo.campos) {
+      if (asignaciones.some((a) => a.name === campo)) continue;
+      asignaciones.push({ id: idEstable(`campo-faltante:${nombre}:${campo}`), name: campo, value: `={{ $json.body.${campo} }}`, type: 'string' });
+      agregados.push(campo);
+    }
+    if (!agregados.length) continue;
+    const uno = agregados.length === 1;
+    t.cambios.push({
+      regla: 'CIM-3',
+      titulo: uno ? 'Campo que faltaba agregado al Set' : 'Campos que faltaban agregados al Set',
+      detalle: `«${nombre}» ahora asigna ${agregados.map((c) => `\`${c}\``).join(', ')} desde ${agregados.map((c) => `\`$json.body.${c}\``).join(', ')}, porque ${grupo.usuarios.map((u) => `«${u}»`).join(', ')} ${uno ? 'lo' : 'los'} usa${grupo.usuarios.length === 1 ? '' : 'n'} y antes ${uno ? 'llegaba vacío' : 'llegaban vacíos'}. Confirma que quien llama al webhook envía ${uno ? 'ese campo' : 'esos campos'} con ${uno ? 'ese nombre' : 'esos nombres'}.`,
+      nodos: [nombre, ...grupo.usuarios],
+      cambiaComportamiento: true,
+    });
   }
 }
 

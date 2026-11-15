@@ -44,6 +44,8 @@ Formulario de contacto de una agencia.
 
 Puntaje de seguridad: 84. Salud de la lógica: 82.
 
+Tras blindar: seguridad 98 y lógica 100. Ciudadela escribe los `||` que faltan, cambia las lecturas a `$json.body` y agrega `phone` a `Edit Fields` desde `$json.body.phone`.
+
 ## workflow-bien-blindado.json
 
 Asistente de pedidos de una tienda, construido con buenas prácticas.

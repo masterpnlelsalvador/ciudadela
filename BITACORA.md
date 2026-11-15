@@ -355,3 +355,41 @@ Fecha: 15 de noviembre de 2026. Objetivo: que quien entra al sitio sin contexto 
 - `#demo`: abre la demostración y limpia la dirección.
 - 195 pruebas pasan.
 - Capturas: `docs/capturas/mejoras-t4-*.jpg`.
+
+### Tarea 5. Reparar del todo los formularios reales
+
+Es la única tarea de la pasada que toca el motor.
+
+**Qué se hizo**
+
+- **CIM-1 por campo** (D67, D68). `$json.company ⏎ $json.companyOrProjectName ⏎ ""` pasa a `$json.company || $json.companyOrProjectName || ""`. Los campos dudosos quedan como corrección manual sin bloquear a los demás.
+- **CIM-3 sin falsos respaldos** (D69). `companyOrProjectName` ya no se reporta en el formulario de contacto.
+- **Campo faltante agregado al Set** (D70). En el formulario de checklist, `Edit Fields` ahora asigna `email` desde `$json.body.email`. Aparece como "Cambia el comportamiento" en "Ver cambios".
+- `test-fixtures/privados/EXPECTED.md` y las pruebas de oro actualizados con el resultado tras blindar.
+- Pruebas propias, sin fixtures privados: `tests/reglas/cimientos-reparacion.test.ts` (17 casos).
+
+**Resultados**
+
+| Workflow | Lógica antes de blindar | Lógica tras blindar (antes de esta tarea) | Lógica tras blindar (ahora) |
+|---|---|---|---|
+| Formulario de contacto (real) | 82 (antes 76: ya no cuenta el falso CIM-3) | 82 | 100 |
+| Formulario de checklist (real) | 76 | 94 | 100 |
+| Ejemplo 2, formulario de leads | 82 | 94 | 100 |
+
+- Los puntajes del análisis de los tres ejemplos no cambian: 0/100, 84/82 y 100/100. El ejemplo 2 blindado sí mejora, de 94 a 100 en lógica, porque tiene el mismo patrón que el formulario real (D71). `public/ejemplos/ESPERADO.md` lo documenta.
+- Los demás workflows reales no cambian ni antes ni después de blindar.
+
+**Estudio de plantillas**
+
+Se volvió a generar `public/estudio.json` con la misma muestra de 500 plantillas. **No cambió ninguna cifra**: el archivo es idéntico. Comparando plantilla por plantilla, ninguna gana ni pierde hallazgos; el cambio de CIM-3 no afecta a ninguna de la muestra.
+
+**Qué falló y cómo se corrigió**
+
+1. **Una prueba del ejemplo 2 esperaba CIM-3 como pendiente manual.** Era el comportamiento anterior. Se actualizó: ahora comprueba que el campo se agrega y que el cambio se marca como cambio de comportamiento.
+
+**Verificación**
+
+- 217 pruebas pasan, 0 omitidas.
+- En la interfaz, el ejemplo 2 blindado muestra "Seguridad 84 → 98 · Lógica 82 → 100" y, en "Ver cambios", "CIM-3 · Campo que faltaba agregado al Set" con la marca "Cambia el comportamiento".
+- Blindar dos veces no cambia nada.
+- **Sin verificar:** la importación en n8n del ejemplo 2 blindado. Quedó en `docs/verificacion/formulario-leads-agencia-blindado.json` para probarla.
