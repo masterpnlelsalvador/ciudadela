@@ -448,3 +448,13 @@ No quedó ninguna tarea sin hacer.
 
 - La dirección del sitio en las etiquetas es `https://ciudadela0.netlify.app`. Si la definitiva es otra, basta definir `URL_DEL_SITIO` en Netlify o cambiar `URL_POR_DEFECTO` en `vite.config.ts`.
 - El ejemplo 2 blindado ahora llega a lógica 100 (antes 94). Es consecuencia de la tarea 5 y está documentado en D71.
+
+### Despliegue de la pasada
+
+Fecha: 15 de noviembre de 2026. Los 7 commits se subieron a GitHub y Netlify publicó el build nuevo. Revisión sobre el sitio publicado, con su política de contenido activa:
+
+- `og:url`, `og:image`, `twitter:card` y `twitter:image` llevan las URL absolutas de `https://ciudadela0.netlify.app`, y `/ciudadela-og.jpg` responde 200 (image/jpeg, 109 kB).
+- La demostración guiada corre completa en 53 segundos, sin peticiones a otros orígenes. El único error de consola es el de la insignia de Netlify (ver "Despliegue" más arriba).
+- La descarga del JSON blindado y la de la imagen para compartir funcionan: la política de contenido no bloquea los enlaces `blob:`. La primera prueba de la tarjeta falló por el script de prueba, no por el sitio; con el diagnóstico (eventos de descarga del navegador) se confirmaron las dos descargas.
+
+Sigue sin verificar cómo se ve la tarjeta del link dentro de Skool y de X.
