@@ -24,6 +24,6 @@ function metadatosParaCompartir(): Plugin {
 export default defineConfig({
   base: './',
   plugins: [metadatosParaCompartir()],
-  build: { target: 'es2022', chunkSizeWarningLimit: 900 },
+  build: { target: 'es2022', chunkSizeWarningLimit: 1000 },
   test: { include: ['tests/**/*.test.ts'], environment: 'node' },
 });

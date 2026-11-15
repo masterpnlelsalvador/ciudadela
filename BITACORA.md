@@ -414,3 +414,37 @@ Nada falló en esta tarea.
 - Antes de blindar y en la vista plano el botón no aparece (D74); al volver a 3D reaparece y la casilla conserva su estado.
 - Consola limpia. 221 pruebas pasan.
 - Muestra: `docs/capturas/mejoras-t6-tarjeta.png`.
+
+### Cierre de la pasada
+
+| Tarea | Estado | Commit |
+|---|---|---|
+| 1. Que los dos clímax se vean | Hecha | `b26a34a` |
+| 2. Ritmo de la simulación | Hecha | `9cd9b77` |
+| 3. Vista previa al compartir el link | Hecha | `a147eca` |
+| 4. Demostración guiada | Hecha | `46e3ee7` |
+| 5. Reparar del todo los formularios reales | Hecha | `960f7e1` |
+| 6. Tarjeta para compartir (opcional) | Hecha | `48c3fcc` |
+
+No quedó ninguna tarea sin hacer.
+
+**Verificación final, sobre el build de producción** (`npm run build` servido con `vite preview`, Chrome sin interfaz)
+
+- Los tres ejemplos recorren los tres actos a 1440×900 (3D) y a 390×800 (vista plano): clínica 0 → 92, formulario 84/82 → 98/100, bien blindado 100 sin nada que corregir. Consola limpia y ninguna petición a otro origen en los seis recorridos.
+- La demostración guiada corre completa en 51 segundos.
+- 221 pruebas pasan, 0 omitidas. `npm run build` genera `dist/` (915 kB de JS, 252 kB comprimido).
+- Las capturas de `docs/capturas/mejoras-*` se volvieron a tomar al final, con todas las tareas aplicadas.
+
+**Lo que no se pudo verificar aquí**
+
+- **Nada de esta pasada está desplegado.** Los commits están en local; el sitio público sigue en la versión anterior hasta que se suban.
+- **La tarjeta del link en Skool y en X.** Solo se ve con el sitio publicado. Las etiquetas y la imagen están en el HTML construido.
+- **La demostración bajo la política de contenido de Netlify.** En local no hay cabeceras. La demostración y la tarjeta no usan scripts en línea ni otros orígenes; la descarga de la tarjeta usa un enlace `blob:`, igual que las descargas que ya existían.
+- **La importación en n8n del ejemplo 2 blindado**, que ahora agrega `phone` al Set: `docs/verificacion/formulario-leads-agencia-blindado.json`.
+- **La fluidez en una laptop real.** El Chrome sin interfaz sirve para medir tiempos y encuadres, no para juzgar cuadros por segundo en el equipo de quien lo use.
+- **La grabación del video.** Se cuidó que los atajos de grabación no interrumpan la demostración, pero no se grabó ninguno.
+
+**Para decidir antes de subir**
+
+- La dirección del sitio en las etiquetas es `https://ciudadela0.netlify.app`. Si la definitiva es otra, basta definir `URL_DEL_SITIO` en Netlify o cambiar `URL_POR_DEFECTO` en `vite.config.ts`.
+- El ejemplo 2 blindado ahora llega a lógica 100 (antes 94). Es consecuencia de la tarea 5 y está documentado en D71.

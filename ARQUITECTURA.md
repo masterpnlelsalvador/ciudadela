@@ -2,7 +2,7 @@
 
 Ciudadela audita la seguridad de workflows de n8n con análisis estático. Todo corre en el navegador: no hay backend, ni analítica, ni peticiones de red en tiempo de ejecución.
 
-Estado: las seis fases están terminadas. Ver `BITACORA.md`.
+Estado: las seis fases y la pasada de mejoras para el concurso están terminadas. Ver `BITACORA.md`.
 
 ## Mapa del repositorio
 
