@@ -309,3 +309,23 @@ Fecha: 15 de noviembre de 2026. Objetivo: que quien entra al sitio sin contexto 
 
 - 185 pruebas pasan. Sin errores en consola.
 - Captura: `docs/capturas/mejoras-t2-transito-1440x900.jpg`.
+
+### Tarea 3. Vista previa al compartir el link
+
+**Qué se hizo**
+
+- `index.html`: `og:title`, `og:description`, `og:image` (con tipo, medidas y texto alternativo), `og:url`, `og:type`, `og:site_name`, `og:locale`, `twitter:card` (`summary_large_image`), `twitter:title`, `twitter:description` y `twitter:image`.
+- `public/ciudadela-og.jpg`, 1200×630 y 109 kB: captura real de la ciudadela de la clínica al terminar el ataque, con el título "Ciudadela" y el lema (D60). Se generó con el mismo Chrome sin interfaz de la tarea 1, capturando solo el lienzo.
+- Las URL absolutas se resuelven al construir (D59).
+- Prueba nueva: `tests/metadatos.test.ts` (etiquetas, marcador de URL, dirección por defecto y medidas de la imagen).
+
+**Qué falló y cómo se corrigió**
+
+1. **El prompt traía `<URL_DEL_SITIO>` sin reemplazar.** No se detuvo el trabajo por eso: se usó la dirección del sitio desplegado y se dejó configurable.
+
+**Verificación**
+
+- `dist/index.html` contiene las etiquetas con `https://ciudadela0.netlify.app/` y `https://ciudadela0.netlify.app/ciudadela-og.jpg`; no queda ningún marcador sin sustituir. Con `URL_DEL_SITIO=https://otra.example` las etiquetas cambian.
+- `dist/ciudadela-og.jpg` existe.
+- 189 pruebas pasan.
+- **Sin verificar:** cómo se ve la tarjeta en Skool y en X. Solo se puede comprobar con el sitio publicado.

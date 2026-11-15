@@ -105,3 +105,11 @@ Para continuar el desarrollo: `ARQUITECTURA.md` (cómo está hecho), `DECISIONES
 ## Los ejemplos
 
 Los tres workflows de `public/ejemplos/` son sintéticos y originales. Están etiquetados como ejemplos en la interfaz y sus hallazgos esperados están en `public/ejemplos/ESPERADO.md`.
+
+## Vista previa al compartir el link
+
+El sitio incluye etiquetas Open Graph y de X, con la imagen `public/ciudadela-og.jpg`. Esas etiquetas necesitan la dirección pública del sitio:
+
+- En Netlify no hay que hacer nada: el build usa el dominio principal del sitio.
+- Si el sitio cambia de dirección, o se publica en otro servicio, define la variable de entorno `URL_DEL_SITIO` (por ejemplo `https://midominio.com`) antes de construir.
+- Sin ninguna de las dos, se usa `https://ciudadela0.netlify.app`.

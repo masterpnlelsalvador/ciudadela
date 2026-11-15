@@ -208,7 +208,9 @@ La vista plano admite arrastre, rueda y pellizco con dos dedos, y los nodos son 
 
 ## Despliegue
 
-`npm run build` genera `dist/` con `index.html`, `assets/`, `ejemplos/` y `estudio.json`. `netlify.toml` fija Node 24 y aplica una política de contenido con `connect-src 'self'`: la página no puede contactar otro origen. `test-fixtures/` y `.cache/` no están en `public/`, así que no se despliegan.
+`npm run build` genera `dist/` con `index.html`, `assets/`, `ejemplos/`, `estudio.json` y `ciudadela-og.jpg`. `netlify.toml` fija Node 24 y aplica una política de contenido con `connect-src 'self'`: la página no puede contactar otro origen. `test-fixtures/` y `.cache/` no están en `public/`, así que no se despliegan.
+
+**Vista previa al compartir.** `index.html` lleva etiquetas Open Graph y de X. Sus URL deben ser absolutas, así que usan el marcador `%URL_DEL_SITIO%`, que un plugin de `vite.config.ts` sustituye al construir. La dirección sale, en este orden, de la variable `URL_DEL_SITIO`, de la variable `URL` que Netlify define con el dominio principal del sitio, o del valor por defecto (`https://ciudadela0.netlify.app`). La imagen es `public/ciudadela-og.jpg` (1200×630).
 
 ## Comandos
 

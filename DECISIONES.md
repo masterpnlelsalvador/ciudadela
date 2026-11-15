@@ -190,3 +190,9 @@ Antes solo la lista del panel juntaba los nodos de paso; el narrador y la simula
 
 **D58. Dentro de un tramo de tránsito el intruso no se detiene.**
 Recorre los nodos de corrido, a velocidad constante, y cada edificio se tiñe al pasar. La narración del tramo aparece al llegar al primer nodo y hay una pausa corta al final. El tope de duración bajó de 24 a 20 segundos.
+
+**D59. La dirección del sitio se resuelve al construir, no se escribe a mano en el HTML.**
+El prompt de la pasada traía el marcador `<URL_DEL_SITIO>` sin reemplazar. Se usa `https://ciudadela0.netlify.app`, la dirección donde está desplegado, como valor por defecto, y el build la toma de `URL_DEL_SITIO` o de la variable `URL` de Netlify si existen. Así un dominio propio no obliga a tocar el código.
+
+**D60. La imagen para compartir muestra el ataque terminado.**
+Es una captura real de la ciudadela del ejemplo de la clínica al final de la simulación: la ruta en rojo y el tesoro saliendo. Es el ejemplo sintético, sin datos de workflows reales. Se compuso con el título y el lema usando las mismas fuentes y colores de la pantalla inicial.
