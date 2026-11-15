@@ -46,9 +46,24 @@ interface Particula {
   ritmo: number;
 }
 
+/** Franjas del lienzo, en píxeles, que tapa la interfaz. La ciudadela se encuadra en lo que queda libre. */
+export interface Margenes {
+  izq: number;
+  der: number;
+  arriba: number;
+  abajo: number;
+}
+
+/** Lo que tapan los controles propios del escenario (botones arriba, pista y leyenda abajo). */
+export const MARGENES_BASE: Margenes = { izq: 20, der: 20, arriba: 54, abajo: 46 };
+
 interface Etiqueta {
   el: HTMLDivElement;
   punto: THREE.Vector3;
+  ancho: number;
+  alto: number;
+  /** Las de más prioridad se colocan primero; una etiqueta que se encima con otra ya colocada se oculta. */
+  prioridad: number;
 }
 
 function semilla(texto: string): number {
@@ -119,6 +134,7 @@ export class Ciudadela {
   private plano: Plano | null = null;
   /** true cuando la persona ya movió la cámara: desde ahí no se reencuadra sola. */
   private camaraMovida = false;
+  private margenes: Margenes = MARGENES_BASE;
   /** Gancho por cuadro para la simulación (recibe performance.now()). */
   alCuadro: ((ahora: number) => void) | null = null;
   private seguido: THREE.Vector3 | null = null;
@@ -395,7 +411,12 @@ export class Ciudadela {
     el.className = `etiqueta-3d etiqueta-${clase}`;
     el.textContent = texto;
     this.capaEtiquetas.appendChild(el);
-    this.etiquetas.push({ el, punto });
+    const prioridad = clase === 'ia' ? 4 : clase === 'abierta' ? 3 : clase.startsWith('simbolo') ? 2 : 1;
+    // Si el lienzo aún no está en la página no hay medidas: se estima por el largo del texto.
+    const ancho = el.offsetWidth || Math.min(190, texto.length * 6.6 + 18);
+    const alto = el.offsetHeight || 20;
+    this.etiquetas.push({ el, punto, ancho, alto, prioridad });
+    this.etiquetas.sort((a, b) => b.prioridad - a.prioridad);
   }
 
   // -------------------------------------------------------------------------
@@ -1051,6 +1072,8 @@ export class Ciudadela {
     const ancho = this.contenedor.clientWidth;
     const alto = this.contenedor.clientHeight;
     const v = new THREE.Vector3();
+    // Las etiquetas van ordenadas por prioridad: la que se encima con una ya colocada se oculta.
+    const colocadas: Array<{ x0: number; x1: number; y0: number; y1: number }> = [];
     for (const e of this.etiquetas) {
       v.copy(e.punto).project(this.camara);
       const visible = v.z < 1 && v.x > -1.1 && v.x < 1.1 && v.y > -1.1 && v.y < 1.1;
@@ -1058,8 +1081,16 @@ export class Ciudadela {
         e.el.style.display = 'none';
         continue;
       }
+      const x = ((v.x + 1) / 2) * ancho;
+      const y = ((1 - v.y) / 2) * alto;
+      const caja = { x0: x - e.ancho / 2 - 3, x1: x + e.ancho / 2 + 3, y0: y - e.alto - 2, y1: y + 2 };
+      if (colocadas.some((c) => caja.x0 < c.x1 && caja.x1 > c.x0 && caja.y0 < c.y1 && caja.y1 > c.y0)) {
+        e.el.style.display = 'none';
+        continue;
+      }
+      colocadas.push(caja);
       e.el.style.display = '';
-      e.el.style.transform = `translate(-50%, -100%) translate(${((v.x + 1) / 2) * ancho}px, ${((1 - v.y) / 2) * alto}px)`;
+      e.el.style.transform = `translate(-50%, -100%) translate(${x}px, ${y}px)`;
     }
   }
 
@@ -1172,25 +1203,88 @@ export class Ciudadela {
     this.vuelo = { p0: this.camara.position.clone(), p1: posicion, o0: this.controles.target.clone(), o1: objetivo, t0: performance.now(), dur: ms };
   }
 
-  /** Encuadra toda la ciudad, mirando desde el sur para que se lea igual que el canvas de n8n. */
-  encuadrar(inmediato = false, salto = false): void {
+  /**
+   * Calcula desde dónde mirar para que toda la ciudadela (muralla, edificios y etiquetas)
+   * quepa en la parte del lienzo que la interfaz deja libre. Mira desde el sur, para que
+   * la ciudad se lea igual que el canvas de n8n.
+   */
+  private calcularEncuadre(m: Margenes): { posicion: THREE.Vector3; objetivo: THREE.Vector3; distancia: number } | null {
     const plano = this.plano;
-    if (!plano) return;
-    const aspecto = this.camara.aspect || 1.6;
-    const vfov = (this.camara.fov * Math.PI) / 180;
-    const hfov = 2 * Math.atan(Math.tan(vfov / 2) * aspecto);
+    if (!plano) return null;
+    const ancho = Math.max(1, this.contenedor.clientWidth);
+    const alto = Math.max(1, this.contenedor.clientHeight);
+    const { minX, maxX, minZ, maxZ } = plano.muralla;
+
+    // Lo que tiene que caber: punto del mundo y cuánto ocupa en píxeles a su alrededor.
+    const puntos: Array<{ p: THREE.Vector3; lado: number; arriba: number }> = [];
+    for (const x of [minX - 1.6, maxX + 1.6]) {
+      for (const z of [minZ - 1.6, maxZ + 1.6]) {
+        puntos.push({ p: new THREE.Vector3(x, 0, z), lado: 0, arriba: 0 }, { p: new THREE.Vector3(x, 3.2, z), lado: 0, arriba: 0 });
+      }
+    }
+    for (const e of this.edificios.values()) puntos.push({ p: new THREE.Vector3(e.x, e.alto, e.z), lado: 6, arriba: 4 });
+    for (const e of this.etiquetas) puntos.push({ p: e.punto, lado: e.ancho / 2 + 4, arriba: e.alto + 4 });
+
+    // Zona libre en coordenadas normalizadas (−1…1). Si la interfaz casi no deja sitio, se ignora.
+    const libreAncho = ancho - m.izq - m.der;
+    const libreAlto = alto - m.arriba - m.abajo;
+    const usar = libreAncho > 160 && libreAlto > 140 ? m : MARGENES_BASE;
+    const x0 = -1 + (2 * usar.izq) / ancho;
+    const x1 = 1 - (2 * usar.der) / ancho;
+    const y0 = -1 + (2 * usar.abajo) / alto;
+    const y1 = 1 - (2 * usar.arriba) / alto;
+
     const elevacion = 0.6; // radianes sobre el horizonte
-    // El tramo de muralla más cercano a la cámara es el que manda en el ancho.
-    const porAncho = (plano.ancho / 2 + 3) / Math.tan(hfov / 2) + (plano.fondo / 2) * Math.cos(elevacion);
-    const porFondo = ((plano.fondo / 2 + 3) * Math.sin(elevacion) + 6) / Math.tan(vfov / 2);
-    const distancia = Math.max(porAncho, porFondo, 20);
     const giro = 0.16;
+    const direccion = new THREE.Vector3(Math.sin(giro) * Math.cos(elevacion), Math.sin(elevacion), Math.cos(giro) * Math.cos(elevacion));
+    const derecha = new THREE.Vector3(Math.cos(giro), 0, -Math.sin(giro));
+    const haciaElFondo = new THREE.Vector3(-Math.sin(giro), 0, -Math.cos(giro));
+    const vfov = (this.camara.fov * Math.PI) / 180;
+    const tanV = Math.tan(vfov / 2);
+    const tanH = tanV * (ancho / alto);
+
+    const camara = this.camara.clone();
+    camara.aspect = ancho / alto;
+    camara.updateProjectionMatrix();
     const objetivo = new THREE.Vector3(0, 1.5, plano.fondo * 0.04);
-    const posicion = new THREE.Vector3(
-      Math.sin(giro) * Math.cos(elevacion) * distancia,
-      Math.sin(elevacion) * distancia,
-      Math.cos(giro) * Math.cos(elevacion) * distancia,
-    ).add(objetivo);
+    let distancia = Math.max(20, (plano.ancho / 2 + 3) / tanH + plano.fondo / 2);
+    const v = new THREE.Vector3();
+    for (let vuelta = 0; vuelta < 40; vuelta++) {
+      camara.position.copy(objetivo).addScaledVector(direccion, distancia);
+      camara.lookAt(objetivo);
+      camara.updateMatrixWorld(true);
+      let a0 = Infinity;
+      let a1 = -Infinity;
+      let b0 = Infinity;
+      let b1 = -Infinity;
+      for (const { p, lado, arriba } of puntos) {
+        v.copy(p).project(camara);
+        a0 = Math.min(a0, v.x - (2 * lado) / ancho);
+        a1 = Math.max(a1, v.x + (2 * lado) / ancho);
+        b0 = Math.min(b0, v.y);
+        b1 = Math.max(b1, v.y + (2 * arriba) / alto);
+      }
+      const escala = Math.max((a1 - a0) / (x1 - x0), (b1 - b0) / (y1 - y0));
+      const errorX = (a0 + a1) / 2 - (x0 + x1) / 2;
+      const errorY = (b0 + b1) / 2 - (y0 + y1) / 2;
+      if (Math.abs(escala - 1) < 0.003 && Math.abs(errorX) < 0.003 && Math.abs(errorY) < 0.003) break;
+      // Centrar: mover el objetivo a la derecha corre la imagen a la izquierda; moverlo hacia el fondo la baja.
+      objetivo.addScaledVector(derecha, errorX * distancia * tanH * 0.9);
+      objetivo.addScaledVector(haciaElFondo, ((errorY * distancia * tanV) / Math.sin(elevacion)) * 0.9);
+      distancia = Math.max(14, distancia * (1 + (escala - 1) * 0.85));
+    }
+    return { posicion: objetivo.clone().addScaledVector(direccion, distancia), objetivo, distancia };
+  }
+
+  /**
+   * Plano general de toda la ciudad. Con `margenes` se indica qué franjas del lienzo tapa
+   * la interfaz (por ejemplo, el panel del narrador) para encuadrar en lo que queda libre.
+   */
+  encuadrar(inmediato = false, salto = false, margenes: Margenes | null = null, ms = 900): void {
+    this.margenes = margenes ?? MARGENES_BASE;
+    const encuadre = this.calcularEncuadre(this.margenes);
+    if (!encuadre) return;
+    const { posicion, objetivo, distancia } = encuadre;
     this.controles.maxDistance = distancia * 3;
     if (salto) {
       this.vuelo = null;
@@ -1202,13 +1296,14 @@ export class Ciudadela {
         this.controles.target.copy(objetivo);
       } else {
         // Llegada suave: empieza un poco más lejos y más alto
-        this.camara.position.copy(posicion).multiplyScalar(1.28).add(new THREE.Vector3(0, distancia * 0.12, 0));
+        const lejos = posicion.clone().sub(objetivo).multiplyScalar(1.28).add(objetivo);
+        this.camara.position.copy(lejos).add(new THREE.Vector3(0, distancia * 0.12, 0));
         this.controles.target.copy(objetivo);
         this.volar(posicion, objetivo, 2200);
       }
     } else {
       this.camaraMovida = false;
-      this.volar(posicion, objetivo);
+      this.volar(posicion, objetivo, ms);
     }
   }
 
@@ -1220,7 +1315,7 @@ export class Ciudadela {
     this.camara.aspect = ancho / alto;
     this.camara.updateProjectionMatrix();
     // Si cambió la forma del lienzo y nadie ha movido la cámara, se vuelve a encuadrar.
-    if (this.plano && !this.camaraMovida && Math.abs(previo - this.camara.aspect) > 0.05) this.encuadrar(false, true);
+    if (this.plano && !this.camaraMovida && Math.abs(previo - this.camara.aspect) > 0.05) this.encuadrar(false, true, this.margenes);
   }
 
   // -------------------------------------------------------------------------

@@ -1,7 +1,8 @@
 // La vista de la ciudadela y sus tres actos: construir, simular el ataque y blindar.
 import type { Analisis, AreaId, Cambio, Hallazgo, NodoAnalizado, PasoRuta, Puntajes, ResultadoBlindaje, RutaAtaque, Severidad, WorkflowN8n } from '../engine/index.ts';
 import { COMO_SE_CALCULA, ETIQUETA_SEVERIDAD, PESO_SEVERIDAD, PIE_DEL_REPORTE, blindar, limpiarParaCompartir, puntoDeRebote, reporteMarkdown } from '../engine/index.ts';
-import { Ciudadela, ID_BOVEDA, ID_FARO } from '../escena/ciudadela.ts';
+import type { Margenes } from '../escena/ciudadela.ts';
+import { Ciudadela, ID_BOVEDA, ID_FARO, MARGENES_BASE } from '../escena/ciudadela.ts';
 import { Simulacion } from '../escena/simulacion.ts';
 import { SimulacionPlana, VistaPlano } from '../escena/vistaPlano.ts';
 import { COLOR_SEVERIDAD, NOMBRE_ROL } from '../escena/paleta.ts';
@@ -134,7 +135,12 @@ interface EstadoNarrador {
   fin: 'llego' | 'reboto' | null;
   /** true cuando se repite el ataque original sobre la ciudadela blindada. */
   trasBlindar: boolean;
+  /** true mientras se muestra el plano final y los botones todavía no aparecen. */
+  enPausa?: boolean;
 }
+
+/** Tiempo que el plano final se queda solo en pantalla antes de mostrar los botones. */
+const PAUSA_FINAL_MS = 2600;
 
 export function crearVista(datos: DatosVista, acciones: { alVolver(): void }): Vista {
   const original = datos.analisis;
@@ -182,11 +188,34 @@ export function crearVista(datos: DatosVista, acciones: { alVolver(): void }): V
     ),
   );
   const pista = h('p', { class: 'escenario-pista' }, 'Arrastra para girar · rueda para acercar · clic en un edificio para ver sus hallazgos');
-  const botonEncuadre = h('button', { class: 'boton boton-icono escenario-encuadre', type: 'button', title: 'Ver toda la ciudadela', 'aria-label': 'Ver toda la ciudadela', onclick: () => ciudadela?.encuadrar() }, icono(ICONO.encuadre));
+  const botonEncuadre = h('button', { class: 'boton boton-icono escenario-encuadre', type: 'button', title: 'Ver toda la ciudadela', 'aria-label': 'Ver toda la ciudadela', onclick: () => ciudadela?.encuadrar(false, false, areaLibre()) }, icono(ICONO.encuadre));
   const escenario = h('section', { class: 'escenario', 'aria-label': 'Ciudadela' }, lienzo, globo, leyenda, pista, botonEncuadre, narrador, detalle);
   const panel = h('aside', { class: 'panel', 'aria-label': 'Reporte' });
   const actos = h('ol', { class: 'actos', 'aria-label': 'Los tres actos' });
   const dialogo = h('dialog', { class: 'dialogo' });
+
+  /**
+   * Franjas del lienzo que tapa el panel del narrador, medidas sobre la página. De las
+   * cuatro zonas que deja libres (arriba, abajo, izquierda, derecha) se elige la mayor.
+   */
+  const areaLibre = (): Margenes => {
+    const base = { ...MARGENES_BASE };
+    if (narrador.hidden) return base;
+    const e = lienzo.getBoundingClientRect();
+    const n = narrador.getBoundingClientRect();
+    if (!e.width || !e.height || n.bottom <= e.top || n.top >= e.bottom || n.right <= e.left || n.left >= e.right) return base;
+    const aire = 14;
+    const opciones: Array<{ area: number; m: Margenes }> = [
+      { area: e.width * (n.top - e.top), m: { ...base, abajo: e.bottom - n.top + aire } },
+      { area: e.width * (e.bottom - n.bottom), m: { ...base, arriba: n.bottom - e.top + aire } },
+      { area: (n.left - e.left) * e.height, m: { ...base, der: e.right - n.left + aire } },
+      { area: (e.right - n.right) * e.height, m: { ...base, izq: n.right - e.left + aire } },
+    ];
+    return opciones.sort((p, q) => q.area - p.area)[0].m;
+  };
+
+  /** Plano general de toda la ciudadela en la zona que el narrador deja libre. */
+  const planoGeneral = (ms = 1700) => ciudadela?.encuadrar(false, false, areaLibre(), ms);
 
   const enfocar = (nombres: string[], severidad?: Severidad) => {
     ciudadela?.enfocar(nombres, severidad ? COLOR_SEVERIDAD[severidad] : 0xffffff);
@@ -622,6 +651,7 @@ export function crearVista(datos: DatosVista, acciones: { alVolver(): void }): V
   // --- Acto 2: simulación de ataque -----------------------------------------
   const cerrarSimulacion = () => {
     if (narrador.hidden) return;
+    turno++;
     simulacion?.detener();
     narrador.hidden = true;
     pista.hidden = false;
@@ -640,12 +670,21 @@ export function crearVista(datos: DatosVista, acciones: { alVolver(): void }): V
     vaciar(narrador);
     const r = e.ruta;
     narrador.classList.toggle('narrador-defensa', e.trasBlindar || !r);
+    narrador.classList.toggle('narrador-final', !!e.fin);
+    narrador.classList.toggle('narrador-en-pausa', !!e.enPausa);
     const otras = e.trasBlindar ? [] : a.rutas.map((x, i) => ({ x, i })).filter(({ i }) => i !== e.indice);
     const cabecera = h(
       'div',
       { class: 'narrador-cabecera' },
       h('span', { class: 'narrador-sello' }, e.trasBlindar ? 'El mismo ataque, después de blindar' : r ? (r.tipo === 'tesoro' ? 'Recorrido de los datos' : 'Simulación de ataque') : 'Prueba de resistencia'),
       r && !e.fin ? h('span', { class: 'narrador-progreso' }, `Paso ${e.paso + 1} de ${r.pasos.length}`) : null,
+      r
+        ? h(
+            'div',
+            { class: 'narrador-puntos', 'aria-hidden': 'true' },
+            r.pasos.map((p, i) => h('i', { class: `${p.regla ? 'clave' : ''} ${i < e.paso || e.fin === 'llego' ? 'hecho' : i === e.paso ? (e.fin === 'reboto' ? 'frenado' : 'actual') : ''}`.trim() })),
+          )
+        : null,
       h('button', { class: 'boton boton-icono narrador-cerrar', type: 'button', 'aria-label': 'Cerrar la simulación', onclick: cerrarSimulacion }, icono(ICONO.cerrar)),
     );
     const cuerpo: Array<Node | null> = [];
@@ -656,13 +695,6 @@ export function crearVista(datos: DatosVista, acciones: { alVolver(): void }): V
           : h('p', { class: 'narrador-texto' }, 'Alguien de fuera se acerca a la muralla y busca una entrada…'),
       );
     } else {
-      cuerpo.push(
-        h(
-          'div',
-          { class: 'narrador-puntos', 'aria-hidden': 'true' },
-          r.pasos.map((p, i) => h('i', { class: `${p.regla ? 'clave' : ''} ${i < e.paso || e.fin === 'llego' ? 'hecho' : i === e.paso ? (e.fin === 'reboto' ? 'frenado' : 'actual') : ''}`.trim() })),
-        ),
-      );
       const actual = r.pasos[e.paso];
       if (e.fin === 'reboto' && actual) {
         const cambio = cambioDe(actual);
@@ -684,11 +716,25 @@ export function crearVista(datos: DatosVista, acciones: { alVolver(): void }): V
       botones.append(h('button', { class: 'boton', type: 'button', onclick: () => simulacion?.saltar() }, 'Saltar'));
     } else {
       botones.append(h('button', { class: 'boton', type: 'button', onclick: () => (e.trasBlindar ? repetirAtaqueOriginal() : simular(e.indice)) }, 'Repetir'));
-      for (const { x, i } of otras.slice(0, 4)) {
-        botones.append(h('button', { class: 'boton boton-ruta', type: 'button', title: `${x.titulo} (hasta «${x.salida}»)`, onclick: () => simular(i) }, h('span', { class: `punto sev-${x.severidad}` }), `Hasta ${x.salida}`));
-      }
       if (!blindaje && e.fin === 'llego' && original.hallazgos.some((x) => x.autocorregible)) {
-        botones.append(h('button', { class: 'boton boton-principal', type: 'button', onclick: () => blindarAhora() }, icono(ICONO.escudo), 'Blindar'));
+        botones.prepend(h('button', { class: 'boton boton-principal', type: 'button', onclick: () => blindarAhora() }, icono(ICONO.escudo), 'Blindar'));
+      }
+      if (otras.length) {
+        // Las demás rutas van en un desplegable para que el panel final ocupe poco alto.
+        botones.append(
+          h(
+            'details',
+            { class: 'otras-rutas' },
+            h('summary', { class: 'boton' }, `Otras rutas (${otras.length})`),
+            h(
+              'div',
+              { class: 'otras-rutas-lista' },
+              otras.map(({ x, i }) =>
+                h('button', { class: 'boton boton-ruta', type: 'button', title: x.titulo, onclick: () => simular(i) }, h('span', { class: `punto sev-${x.severidad}` }), `Hasta ${x.salida}`),
+              ),
+            ),
+          ),
+        );
       }
       botones.append(h('button', { class: 'boton', type: 'button', onclick: cerrarSimulacion }, 'Volver a la ciudadela'));
     }
@@ -696,7 +742,6 @@ export function crearVista(datos: DatosVista, acciones: { alVolver(): void }): V
       narrador,
       cabecera,
       ...cuerpo,
-      e.fin && otras.length ? h('p', { class: 'narrador-sub' }, otras.length === 1 ? 'Hay otra ruta posible. Mírala:' : `Hay ${otras.length} rutas más. Mira hasta dónde llegan:`) : null,
       botones,
       h('p', { class: 'narrador-nota' }, NOTA_SIMULACION),
     );
@@ -716,20 +761,32 @@ export function crearVista(datos: DatosVista, acciones: { alVolver(): void }): V
     return true;
   };
 
+  /**
+   * Cierre de una simulación: la cámara se abre a un plano general en la zona que el
+   * narrador deja libre y, tras una pausa, aparecen los botones.
+   */
+  let turno = 0;
+  const cerrarConPlanoGeneral = (final: EstadoNarrador) => {
+    const mio = ++turno;
+    const conPausa = !sinMovimiento();
+    pintarNarrador({ ...final, enPausa: conPausa });
+    planoGeneral();
+    if (!conPausa) return;
+    window.setTimeout(() => {
+      if (mio === turno) narrador.classList.remove('narrador-en-pausa');
+    }, PAUSA_FINAL_MS);
+  };
+
   const correr = (r: RutaAtaque, indice: number, reboteEn: number | null, trasBlindar: boolean) => {
     const estado = (paso: number, fin: EstadoNarrador['fin']): EstadoNarrador => ({ ruta: r, indice, paso, fin, trasBlindar });
+    turno++;
     pintarNarrador(estado(0, null));
     simulacion!.iniciar({
       pasos: r.pasos.map((p) => ({ nodo: p.nodo, clave: !!p.regla })),
       reboteEn,
       alPaso: (i) => pintarNarrador(estado(i, null)),
       alRebote: (i) => pintarNarrador(estado(i, 'reboto')),
-      alTerminar: (resultado) => {
-        pintarNarrador(estado(resultado === 'reboto' ? (reboteEn ?? 0) : r.pasos.length - 1, resultado));
-        // Al terminar, la cámara se aleja para mostrar todo el recorrido.
-        const hasta = resultado === 'reboto' ? r.pasos.slice(0, (reboteEn ?? 0) + 1) : r.pasos;
-        ciudadela?.enfocar(hasta.map((p) => p.nodo), 0xffffff, false);
-      },
+      alTerminar: (resultado) => cerrarConPlanoGeneral(estado(resultado === 'reboto' ? (reboteEn ?? 0) : r.pasos.length - 1, resultado)),
     });
   };
 
@@ -744,13 +801,14 @@ export function crearVista(datos: DatosVista, acciones: { alVolver(): void }): V
     // Sin ruta: el intruso se acerca a la puerta y la ciudadela resiste.
     const puerta = a.nodos.find((n) => n.rol === 'entrada_no_confiable') ?? a.nodos.find((n) => n.rol === 'entrada_interna');
     const estado = (fin: EstadoNarrador['fin']): EstadoNarrador => ({ ruta: null, indice: -1, paso: 0, fin, trasBlindar: false });
+    turno++;
     pintarNarrador(estado(null));
     simulacion!.iniciar({
       pasos: [{ nodo: puerta?.nombre ?? '', clave: true }],
       reboteEn: 0,
       alPaso: () => undefined,
       alRebote: () => undefined,
-      alTerminar: (resultado) => pintarNarrador(estado(resultado)),
+      alTerminar: (resultado) => cerrarConPlanoGeneral(estado(resultado)),
     });
   };
 

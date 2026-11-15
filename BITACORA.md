@@ -258,3 +258,29 @@ Se agregaron a `test-fixtures/privados/` los tres workflows que `EXPECTED.md` de
 
 - La lectura del reporte en un teléfono real (solo se probó con emulación a 375 px).
 - La fluidez de la vista 3D con unos 150 nodos en una laptop.
+
+## Pasada de mejoras para el concurso
+
+Fecha: 15 de noviembre de 2026. Objetivo: que quien entra al sitio sin contexto vea la historia completa en uno o dos minutos. No se agregan reglas al motor, salvo en la tarea 5.
+
+### Tarea 1. Que los dos clímax se vean
+
+**Qué se hizo**
+
+- Encuadre nuevo: la cámara se calcula proyectando la muralla, los edificios y las etiquetas, y los encaja en la parte del lienzo que la interfaz deja libre (D52, D53).
+- Al terminar cualquier simulación, la cámara se abre a un plano general de toda la ciudadela por encima del narrador. Tras el rebote, el plano de la ciudadela blindada se queda 2,6 segundos solo antes de que aparezcan los botones (D54).
+- Panel final compacto: las rutas alternativas van en el desplegable "Otras rutas (5)" y los puntos de progreso en la cabecera (D55). A 1440×900 el panel final mide 206 px de alto.
+- Las etiquetas que se enciman se ocultan por prioridad (D56).
+- La vista plano acepta los mismos márgenes: en móvil el plano queda completo por encima del narrador.
+
+**Qué falló y cómo se corrigió**
+
+1. **El panel de navegador de la sesión no servía para verificar.** Dibuja cerca de un cuadro por segundo y entrega capturas reducidas a 800 px. Corrección: se verificó con un Chrome sin interfaz manejado por un script (fuera del repositorio), con WebGL real, al tamaño exacto de la ventana. El script mide la caja de cada etiqueta y del narrador y avisa si algo se recorta, se encima o queda tapado.
+
+**Verificación**
+
+- Encuadre inicial a 1440×900, 1280×720 y 1920×1080: ninguna etiqueta recortada; la más cercana al borde derecho queda a 23 px.
+- Final del ataque y final del rebote a 1440×900: ninguna etiqueta bajo el narrador; la ciudadela completa queda por encima.
+- Workflow sintético de 45 nodos y dos workflows reales de 49 y 57 nodos: sin etiquetas encimadas (se ocultan una o dos secundarias).
+- 390×800 (vista plano) y 900×700 (3D): el plano completo queda por encima del narrador, sin desborde horizontal.
+- Capturas en `docs/capturas/`: `mejoras-t1-final-ataque-1440x900.jpg`, `mejoras-t1-final-rebote-1440x900.jpg` y `mejoras-t1-inicial-*.jpg`.

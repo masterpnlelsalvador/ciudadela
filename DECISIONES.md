@@ -167,3 +167,20 @@ Google Sheets, Airtable y las tablas de datos de n8n devuelven la fila que acaba
 
 **D51. Al volver a analizar la muestra sin red, la fecha del estudio no cambia.**
 `npm run estudio -- --sin-red` analiza las mismas plantillas descargadas. La fecha que se muestra es la del día en que se tomó la muestra, no la del reanálisis.
+
+## Pasada de mejoras para el concurso
+
+**D52. El encuadre se calcula proyectando lo que tiene que caber, no con una fórmula.**
+La fórmula anterior usaba solo el ancho y el fondo de la muralla. No sabía de las etiquetas ni del faro, que es más alto que todo lo demás, y por eso quedaban pegados al borde. Ahora se proyectan las esquinas de la muralla, la cima de cada edificio y cada etiqueta con su tamaño real, y se ajustan distancia y centro hasta que todo entra en la zona libre. El mismo cálculo sirve para el encuadre inicial y para el plano final con el narrador abierto.
+
+**D53. El área libre se mide en la página, no se supone.**
+El narrador cambia de alto según el texto y, en pantallas angostas, se ancla al borde de la ventana. `areaLibre` compara su caja con la del lienzo y elige la mayor de las cuatro zonas que quedan libres.
+
+**D54. Al terminar la simulación siempre hay plano general, y los botones esperan.**
+El resultado (edificios en rojo, tesoro saliendo, o la ciudadela blindada) es lo que tiene que verse. Los botones aparecen 2,6 segundos después. Con `prefers-reduced-motion` no hay pausa.
+
+**D55. Las rutas alternativas van en un desplegable.**
+Con seis rutas, los botones ocupaban dos filas y el panel final tapaba el centro de la ciudadela. "Otras rutas (5)" se abre hacia arriba y no cambia el alto del panel. Los puntos de progreso pasaron a la cabecera.
+
+**D56. Las etiquetas que se enciman se ocultan por prioridad.**
+Primero las torres de IA, luego las puertas abiertas, los símbolos (bóveda y faro) y al final las puertas cerradas. El nombre sigue disponible al pasar el cursor.

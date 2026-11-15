@@ -130,6 +130,10 @@ Puntaje: `100 − Σ pesos` con mínimo 0 (crítico 25, alto 12, medio 6, bajo 2
 
 **Interacción.** `alPasar` (nombre bajo el cursor) y `alElegir` (clic) avisan a `vista.ts`, que pinta el globo y el panel de detalle. `enfocar(nombres)` levanta haces de luz y acerca la cámara. `lugarDe(nombre)` devuelve la posición de un edificio; lo usará la simulación de la fase 3.
 
+**Encuadre.** `Ciudadela.encuadrar(inmediato, salto, margenes, ms)` calcula la cámara para que quepan la muralla, todos los edificios y todas las etiquetas (con su tamaño en píxeles) dentro de la parte del lienzo que la interfaz deja libre. `margenes` son las franjas tapadas, en píxeles; sin ese parámetro se usan las de los controles propios del escenario (`MARGENES_BASE`). El cálculo proyecta los puntos con una copia de la cámara y corrige distancia y centro hasta que encajan. `VistaPlano.encuadrar` acepta los mismos parámetros.
+
+**Etiquetas.** Cada etiqueta tiene prioridad (torre de IA, puerta abierta, símbolos, puertas cerradas). En cada cuadro se colocan por prioridad y la que se encima con otra ya colocada se oculta.
+
 **Accesibilidad.** Con `prefers-reduced-motion` no hay animación de construcción, vuelos de cámara ni partículas en movimiento. Si no hay WebGL, la vista muestra solo el reporte (la vista plano 2D llega en la fase 6).
 
 ## Simulación de ataque
@@ -141,6 +145,8 @@ Puntaje: `100 − Σ pesos` con mínimo 0 (crítico 25, alto 12, medio 6, bajo 2
 - **Rebote.** Con `reboteEn: k`, el intruso se frena antes del paso `k`, aparece un destello y un escudo, y sale despedido. Se usa cuando no hay ruta (`k = 0`: la puerta resiste) y, en la fase 4, cuando el blindaje corrigió ese paso.
 - **Sin animaciones.** Con `prefers-reduced-motion` se muestra directamente el estado final. El botón "Saltar" hace lo mismo.
 - **Tiempo.** La simulación lleva su propio reloj: si la pestaña estuvo oculta, ese tiempo no cuenta.
+
+**Final.** Cuando la simulación termina (llegó o rebotó), `vista.ts` mide qué parte del lienzo tapa el narrador (`areaLibre`) y pide un plano general en la zona libre. Los botones del narrador aparecen después de una pausa de 2,6 segundos, para que el plano final se vea solo.
 
 La narración (`vista.ts`, bloque "Acto 2") toma los textos de `ruta.pasos[i].texto`, que escribe `src/engine/rutas.ts`. La interfaz no redacta nada por su cuenta.
 

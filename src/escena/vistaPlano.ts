@@ -4,7 +4,7 @@ import type { Analisis, NodoAnalizado } from '../engine/index.ts';
 import { CSS_SEVERIDAD } from './paleta.ts';
 import type { Plano } from './plano.ts';
 import { calcularPlano } from './plano.ts';
-import type { OpcionesCiudadela } from './ciudadela.ts';
+import type { Margenes, OpcionesCiudadela } from './ciudadela.ts';
 import { ID_BOVEDA, ID_FARO } from './ciudadela.ts';
 import type { OpcionesSimulacion } from './simulacion.ts';
 
@@ -247,8 +247,29 @@ export class VistaPlano {
     this.distanciaPrevia = 0;
   };
 
-  encuadrar(): void {
-    this.caja = { ...this.inicial };
+  /**
+   * Muestra todo el plano. Con `margenes` (franjas del lienzo que tapa la interfaz, en
+   * píxeles) lo coloca en la parte libre. Los dos primeros parámetros existen para
+   * ofrecer la misma firma que la escena 3D.
+   */
+  encuadrar(_inmediato = false, _salto = false, margenes: Margenes | null = null): void {
+    const r = this.svg.getBoundingClientRect();
+    const libreAncho = margenes ? r.width - margenes.izq - margenes.der : 0;
+    const libreAlto = margenes ? r.height - margenes.arriba - margenes.abajo : 0;
+    if (!margenes || libreAncho < 120 || libreAlto < 100) {
+      this.caja = { ...this.inicial };
+    } else {
+      // Unidades del plano por píxel para que el plano completo quepa en la zona libre.
+      const escala = Math.max(this.inicial.w / libreAncho, this.inicial.h / libreAlto);
+      const centroX = this.inicial.x + this.inicial.w / 2;
+      const centroY = this.inicial.y + this.inicial.h / 2;
+      this.caja = {
+        w: r.width * escala,
+        h: r.height * escala,
+        x: centroX - (margenes.izq + libreAncho / 2) * escala,
+        y: centroY - (margenes.arriba + libreAlto / 2) * escala,
+      };
+    }
     this.aplicarCaja();
   }
 
