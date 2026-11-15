@@ -2,7 +2,7 @@
 // a terceros ni se envía el workflow a ningún servidor.
 import './estilos.css';
 import { ErrorDeFormato, analizarWorkflow, leerWorkflow } from './engine/index.ts';
-import { crearInicio } from './ui/inicio.ts';
+import { EJEMPLOS, crearInicio, leerEjemplo } from './ui/inicio.ts';
 import type { Ejemplo } from './ui/inicio.ts';
 import { crearVista } from './ui/vista.ts';
 import type { Vista } from './ui/vista.ts';
@@ -19,7 +19,7 @@ function mostrarInicio(): void {
       // Un respiro para que el botón muestre "Analizando…" antes de trabajar.
       setTimeout(() => {
         try {
-          mostrarCiudadela(texto, origen.ejemplo);
+          mostrarCiudadela(texto, origen.ejemplo, origen.demostracion);
         } catch (e) {
           inicio.ocupado(false);
           if (e instanceof ErrorDeFormato) inicio.mostrarError(e.message);
@@ -35,13 +35,21 @@ function mostrarInicio(): void {
   document.title = 'Ciudadela · Mira tu workflow de n8n como lo vería un intruso';
 }
 
-function mostrarCiudadela(texto: string, ejemplo?: Ejemplo): void {
+function mostrarCiudadela(texto: string, ejemplo?: Ejemplo, demostracion = false): void {
   const { workflow, avisos } = leerWorkflow(texto);
   const analisis = analizarWorkflow(workflow, avisos);
   vista?.destruir();
-  vista = crearVista({ workflow, analisis, esEjemplo: !!ejemplo }, { alVolver: mostrarInicio });
+  vista = crearVista({ workflow, analisis, esEjemplo: !!ejemplo, demostracion }, { alVolver: mostrarInicio });
   raiz.replaceChildren(vista.el);
   document.title = `${analisis.nombre} · Ciudadela`;
 }
 
 mostrarInicio();
+
+// Un enlace que termina en #demo abre directamente la demostración guiada.
+if (location.hash === '#demo') {
+  history.replaceState(null, '', location.pathname + location.search);
+  leerEjemplo(EJEMPLOS[0])
+    .then((texto) => mostrarCiudadela(texto, EJEMPLOS[0], true))
+    .catch(() => undefined);
+}

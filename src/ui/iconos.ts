@@ -23,6 +23,7 @@ export const ICONO = {
   cerrar: svg('<path d="M6 6l12 12"/><path d="M18 6L6 18"/>'),
   encuadre: svg('<path d="M4 9V4h5"/><path d="M20 9V4h-5"/><path d="M4 15v5h5"/><path d="M20 15v5h-5"/>'),
   flecha: svg('<path d="M9 6l6 6-6 6"/>'),
+  reproducir: svg('<circle cx="12" cy="12" r="9"/><path d="M10 8.5l5.5 3.5-5.5 3.5z" fill="currentColor"/>'),
   check: svg('<path d="M5 12.5l4.5 4.5L19 7.5"/>'),
   ruta: svg('<circle cx="5" cy="18" r="2"/><circle cx="19" cy="6" r="2"/><path d="M7 18h6a4 4 0 0 0 0-8h-2a4 4 0 0 1 0-8h6"/>'),
 };

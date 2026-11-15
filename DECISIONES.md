@@ -196,3 +196,21 @@ El prompt de la pasada traía el marcador `<URL_DEL_SITIO>` sin reemplazar. Se u
 
 **D60. La imagen para compartir muestra el ataque terminado.**
 Es una captura real de la ciudadela del ejemplo de la clínica al final de la simulación: la ruta en rojo y el tesoro saliendo. Es el ejemplo sintético, sin datos de workflows reales. Se compuso con el título y el lema usando las mismas fuentes y colores de la pantalla inicial.
+
+**D61. La demostración maneja la vista con las mismas funciones que los botones.**
+No hay un "modo demo" dentro de la escena ni del motor. La demostración recibe un control con `simular`, `blindar` y un aviso de fin de simulación. Lo que se ve es exactamente lo que vería quien pulsara los botones.
+
+**D62. Los subtítulos salen del análisis.**
+"De sus 8 defensas, 5 están rotas y 2 tienen grietas" y "Seguridad 0 → 92" se calculan con los datos del workflow cargado. Hay pruebas con los tres ejemplos, incluido el que no tiene ruta de ataque.
+
+**D63. Interrumpir no deshace nada.**
+Al intervenir se quita la franja y la aplicación queda donde iba: una simulación en marcha continúa y la ciudadela blindada sigue blindada. El evento no se cancela, así que el mismo clic que interrumpe también hace lo que la persona quería hacer.
+
+**D64. Las teclas modificadoras y los atajos del sistema no interrumpen.**
+Shift, Ctrl, Alt, la tecla de sistema, las teclas de función e Imprimir pantalla se ignoran. Sin esto, el atajo para empezar a grabar la pantalla detendría la demostración que se quiere grabar.
+
+**D65. Enlace directo con `#demo`.**
+No estaba pedido. Sirve para compartir un link que abre la demostración sin que el jurado tenga que buscar el botón. El fragmento se quita de la dirección al arrancar; no lleva ningún dato del usuario.
+
+**D66. La franja de subtítulos es una fila propia, no una capa.**
+En escritorio no tapa ni el reporte ni la ciudadela. En pantallas angostas, donde la página se desplaza, se ancla abajo y el narrador se coloca encima usando el alto real de la franja.

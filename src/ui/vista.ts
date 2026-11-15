@@ -8,6 +8,8 @@ import { agruparPasos, indiceAgrupado } from '../escena/agrupar.ts';
 import { Simulacion } from '../escena/simulacion.ts';
 import { SimulacionPlana, VistaPlano } from '../escena/vistaPlano.ts';
 import { COLOR_SEVERIDAD, NOMBRE_ROL } from '../escena/paleta.ts';
+import type { Demostracion, ZonaResaltada } from './demostracion.ts';
+import { iniciarDemostracion } from './demostracion.ts';
 import { h, icono, poner, textoRico, vaciar } from './dom.ts';
 import { ICONO, ICONO_DEFENSA } from './iconos.ts';
 
@@ -15,6 +17,8 @@ export interface DatosVista {
   workflow: WorkflowN8n;
   analisis: Analisis;
   esEjemplo: boolean;
+  /** true para recorrer los tres actos en modo demostración al abrir la vista. */
+  demostracion?: boolean;
 }
 
 export interface Vista {
@@ -753,14 +757,21 @@ export function crearVista(datos: DatosVista, acciones: { alVolver(): void }): V
    * narrador deja libre y, tras una pausa, aparecen los botones.
    */
   let turno = 0;
+  /** Lo usa la demostración para saber cuándo terminó la simulación que pidió. */
+  let avisoFinDeSimulacion: (() => void) | null = null;
   const cerrarConPlanoGeneral = (final: EstadoNarrador) => {
     const mio = ++turno;
     const conPausa = !sinMovimiento();
     pintarNarrador({ ...final, enPausa: conPausa });
     planoGeneral();
-    if (!conPausa) return;
+    if (!conPausa) {
+      avisoFinDeSimulacion?.();
+      return;
+    }
     window.setTimeout(() => {
-      if (mio === turno) narrador.classList.remove('narrador-en-pausa');
+      if (mio !== turno) return;
+      narrador.classList.remove('narrador-en-pausa');
+      avisoFinDeSimulacion?.();
     }, PAUSA_FINAL_MS);
   };
 
@@ -938,15 +949,52 @@ export function crearVista(datos: DatosVista, acciones: { alVolver(): void }): V
   // tamaño). Se usa una microtarea y no requestAnimationFrame: en una pestaña en
   // segundo plano los cuadros no llegan, y un montaje tardío pisaría lo que la
   // persona ya hizo.
+  // --- Demostración guiada ---------------------------------------------------
+  let demostracion: Demostracion | null = null;
+  const resaltar = (zona: ZonaResaltada) => {
+    for (const marcado of panel.querySelectorAll('.demo-resaltado')) marcado.classList.remove('demo-resaltado');
+    if (!zona) return;
+    panel.querySelector(`.${zona}`)?.classList.add('demo-resaltado');
+    // En escritorio el panel tiene su propio desplazamiento; en móvil no se mueve la página.
+    if (panel.scrollHeight > panel.clientHeight + 4) panel.scrollTo({ top: 0, behavior: sinMovimiento() ? 'auto' : 'smooth' });
+  };
+  const empezarDemostracion = () => {
+    demostracion = iniciarDemostracion({
+      original,
+      simular: () => simular(0),
+      blindar: () => {
+        blindarAhora();
+        return blindaje;
+      },
+      reboteEn: () => {
+        const r = original.rutaPrincipal;
+        const i = r && blindaje ? puntoDeRebote(r, blindaje.despues) : null;
+        return r && i !== null ? r.pasos[i].nodo : null;
+      },
+      alTerminarSimulacion: (aviso) => (avisoFinDeSimulacion = aviso),
+      resaltar,
+      volver: acciones.alVolver,
+      alCambiarFranja: (visible) => {
+        el.classList.toggle('vista-en-demo', visible);
+        el.style.setProperty('--demo-alto', `${visible && demostracion ? demostracion.el.offsetHeight : 0}px`);
+      },
+    });
+    el.append(demostracion.el);
+    el.classList.add('vista-en-demo');
+    el.style.setProperty('--demo-alto', `${demostracion.el.offsetHeight}px`);
+  };
+
   let destruida = false;
   queueMicrotask(() => {
     if (!destruida && !ciudadela) montarEscena();
+    if (!destruida && datos.demostracion) empezarDemostracion();
   });
 
   return {
     el,
     destruir: () => {
       destruida = true;
+      demostracion?.detener();
       simulacion?.detener();
       ciudadela?.destruir();
       ciudadela = null;

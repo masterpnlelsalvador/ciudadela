@@ -329,3 +329,29 @@ Fecha: 15 de noviembre de 2026. Objetivo: que quien entra al sitio sin contexto 
 - `dist/ciudadela-og.jpg` existe.
 - 189 pruebas pasan.
 - **Sin verificar:** cómo se ve la tarjeta en Skool y en X. Solo se puede comprobar con el sitio publicado.
+
+### Tarea 4. Demostración guiada
+
+**Qué se hizo**
+
+- Botón "Ver demostración (1 min)" en la pantalla inicial, sobre los ejemplos. Carga el ejemplo de la clínica y recorre los tres actos con subtítulos en una franja inferior (D61, D62, D66).
+- Acto 1: pausa en el puntaje (0) y en las defensas, resaltados en el panel. Acto 2: simulación completa. Acto 3: blindaje, rebote y plano final con "Seguridad 0 → 92". Cierra con "Ahora prueba con tu workflow" y dos botones: "Analizar mi workflow" y "Seguir explorando".
+- Cualquier clic, tecla o toque la interrumpe y deja la app usable donde iba (D63, D64).
+- Con `prefers-reduced-motion` avanza con un botón "Siguiente".
+- Enlace directo: la dirección del sitio terminada en `#demo` (D65).
+- Prueba nueva: `tests/demostracion.test.ts` (6 casos) sobre los subtítulos.
+
+**Qué falló y cómo se corrigió**
+
+1. **Sin animaciones, la demostración se habría quedado esperando 45 segundos.** En ese modo la simulación termina dentro de la misma llamada que la inicia, antes de que la demostración registrara su aviso. Corrección: el aviso se registra antes de pedir la simulación o el blindaje.
+2. **En móvil, el botón de cerrar de la invitación final quedaba cortado.** La fila tenía tres botones. Corrección: en la invitación final no se muestra, porque "Seguir explorando" hace lo mismo.
+
+**Verificación** (Chrome sin interfaz)
+
+- 1440×900: 51 segundos de principio a fin; siete subtítulos; consola limpia; ninguna petición a otro origen. Al terminar, "Seguir explorando" cierra la franja y "Ver cambios" abre su diálogo.
+- Interrupciones: Shift no interrumpe; un clic durante el acto 1 quita la franja y "Simular ataque" responde; una tecla a mitad de la simulación quita la franja y la simulación termina sola, sin que nada se blinde después; un toque en móvil durante el acto 3 deja la ciudadela blindada y utilizable.
+- Sin animaciones: cuatro pasos con "Siguiente" y la invitación final; no avanza sola.
+- 390×800: 41 segundos; la franja y el narrador no se enciman; sin desborde horizontal.
+- `#demo`: abre la demostración y limpia la dirección.
+- 195 pruebas pasan.
+- Capturas: `docs/capturas/mejoras-t4-*.jpg`.

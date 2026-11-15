@@ -28,7 +28,14 @@ export const EJEMPLOS: Ejemplo[] = [
 ];
 
 export interface AccionesInicio {
-  alAnalizar(texto: string, origen: { ejemplo?: Ejemplo; archivo?: string }): void;
+  alAnalizar(texto: string, origen: { ejemplo?: Ejemplo; archivo?: string; demostracion?: boolean }): void;
+}
+
+/** Lee el JSON de un ejemplo precargado (un archivo del propio sitio). */
+export async function leerEjemplo(e: Ejemplo): Promise<string> {
+  const respuesta = await fetch(`./ejemplos/${e.archivo}`);
+  if (!respuesta.ok) throw new Error(String(respuesta.status));
+  return respuesta.text();
 }
 
 export interface PantallaInicio {
@@ -103,9 +110,26 @@ export function crearInicio(acciones: AccionesInicio): PantallaInicio {
     if (f) leerArchivo(f);
   });
 
+  const abrirEjemplo = async (e: Ejemplo, demostracion = false) => {
+    mostrarError('');
+    try {
+      acciones.alAnalizar(await leerEjemplo(e), { ejemplo: e, demostracion });
+    } catch {
+      mostrarError('No se pudo cargar el ejemplo.');
+    }
+  };
+
+  const demostracion = h(
+    'div',
+    { class: 'inicio-demo' },
+    h('button', { class: 'boton boton-demo', type: 'button', onclick: () => abrirEjemplo(EJEMPLOS[0], true) }, icono(ICONO.reproducir), 'Ver demostración (1 min)'),
+    h('span', { class: 'inicio-demo-nota' }, 'Recorre sola los tres actos con el ejemplo de la clínica: construir, simular el ataque y blindar.'),
+  );
+
   const ejemplos = h(
     'div',
     { class: 'inicio-ejemplos' },
+    demostracion,
     h('p', { class: 'inicio-ejemplos-titulo' }, '¿No tienes uno a mano? Prueba con un ejemplo:'),
     h(
       'div',
@@ -116,16 +140,7 @@ export function crearInicio(acciones: AccionesInicio): PantallaInicio {
           {
             class: 'ejemplo',
             type: 'button',
-            onclick: async () => {
-              mostrarError('');
-              try {
-                const respuesta = await fetch(`./ejemplos/${e.archivo}`);
-                if (!respuesta.ok) throw new Error(String(respuesta.status));
-                acciones.alAnalizar(await respuesta.text(), { ejemplo: e });
-              } catch {
-                mostrarError('No se pudo cargar el ejemplo.');
-              }
-            },
+            onclick: () => abrirEjemplo(e),
           },
           h('span', { class: 'ejemplo-etiqueta' }, 'Ejemplo'),
           h('strong', { text: e.titulo }),

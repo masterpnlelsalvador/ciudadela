@@ -31,6 +31,7 @@ src/ui/
   dom.ts              Utilidades de DOM (todo dato del workflow entra como texto, nunca como HTML).
   iconos.ts           Iconos SVG de las defensas.
   estudio.ts          Sección "Lo que encontramos en N plantillas públicas" (lee estudio.json).
+  demostracion.ts     Demostración guiada: guion (textos a partir del análisis) y franja inferior.
 src/escena/
   plano.ts            Posiciones de n8n → parcelas, muralla y puertas.
   ciudadela.ts        Clase Ciudadela (three.js): edificios, símbolos, cámara e interacción.
@@ -151,6 +152,20 @@ Puntaje: `100 − Σ pesos` con mínimo 0 (crítico 25, alto 12, medio 6, bajo 2
 **Final.** Cuando la simulación termina (llegó o rebotó), `vista.ts` mide qué parte del lienzo tapa el narrador (`areaLibre`) y pide un plano general en la zona libre. Los botones del narrador aparecen después de una pausa de 2,6 segundos, para que el plano final se vea solo.
 
 La narración (`vista.ts`, bloque "Acto 2") toma los textos de `ruta.pasos[i].texto`, que escribe `src/engine/rutas.ts`. La interfaz no redacta nada por su cuenta.
+
+## Demostración guiada
+
+El botón "Ver demostración (1 min)" de la pantalla inicial, o un enlace que termine en `#demo`, abre el ejemplo de la clínica con `demostracion: true`. `src/ui/demostracion.ts` recorre entonces los tres actos:
+
+1. Acto 1: presenta la ciudadela y resalta el puntaje y las defensas.
+2. Acto 2: pide la simulación de ataque y espera a que termine.
+3. Acto 3: pide el blindaje, espera el rebote y resalta "Seguridad 0 → 92". Termina con la invitación "Ahora prueba con tu workflow".
+
+La demostración no analiza ni anima nada por su cuenta. Recibe de `vista.ts` un `ControlDeDemostracion` con las mismas funciones que usan los botones (`simular`, `blindar`) y un aviso de fin de simulación. Los subtítulos se arman con funciones puras (`textoPuntaje`, `textoAtaque`, `textoResultado`…) a partir del `Analisis` y del resultado del blindaje.
+
+- **Interrupción.** Cualquier `pointerdown`, `touchstart` o `keydown` fuera de la franja detiene la demostración: se quita la franja y se cancelan sus esperas, pero no se toca nada más. Si había una simulación en marcha, sigue. Las teclas modificadoras, las de función y los atajos con Ctrl, Alt o la tecla de sistema no cuentan, para poder grabar la pantalla.
+- **Sin animaciones.** Con `prefers-reduced-motion` cada paso espera al botón "Siguiente".
+- **Franja.** En escritorio es una tercera fila de la vista (no tapa nada). En pantallas angostas se ancla al borde inferior y el narrador se apoya encima.
 
 ## Blindaje
 

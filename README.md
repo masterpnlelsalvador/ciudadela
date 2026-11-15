@@ -113,3 +113,9 @@ El sitio incluye etiquetas Open Graph y de X, con la imagen `public/ciudadela-og
 - En Netlify no hay que hacer nada: el build usa el dominio principal del sitio.
 - Si el sitio cambia de dirección, o se publica en otro servicio, define la variable de entorno `URL_DEL_SITIO` (por ejemplo `https://midominio.com`) antes de construir.
 - Sin ninguna de las dos, se usa `https://ciudadela0.netlify.app`.
+
+## Demostración guiada
+
+En la pantalla inicial, "Ver demostración (1 min)" recorre sola los tres actos con el ejemplo de la clínica. Cualquier clic, tecla o toque la detiene y deja la aplicación lista para usar.
+
+Para abrirla directamente, agrega `#demo` al final de la dirección del sitio (por ejemplo `https://ciudadela0.netlify.app/#demo`).
